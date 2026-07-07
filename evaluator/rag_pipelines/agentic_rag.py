@@ -6,6 +6,7 @@ import json
 from typing import List
 from evaluator.config import config
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
+from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding
 
 logger = logging.getLogger("AgenticRAG")
 
@@ -59,8 +60,12 @@ class AgenticRAG(BaseRAGPipeline):
         primary_vector = None
 
         for sub_q in sub_queries:
-            embed_resp = litellm.embedding(model=self.embedding_model, input=[sub_q])
-            vec = embed_resp['data'][0]['embedding']
+            if is_mock_key(config.OPENAI_API_KEY):
+                vec = generate_mock_embedding(sub_q)
+                logger.info("Using mock embedding for offline mode.")
+            else:
+                embed_resp = litellm.embedding(model=self.embedding_model, input=[sub_q])
+                vec = embed_resp['data'][0]['embedding']
             if primary_vector is None:
                 primary_vector = vec
 

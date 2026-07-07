@@ -1,7 +1,14 @@
+import os
+import sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import logging
 import psycopg2
 import litellm
 from evaluator.config import config
+from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("DBSeeder")
@@ -30,8 +37,12 @@ def seed_database():
             logger.info("Database schema and pgvector structures created successfully.")
 
             for chunk in SAMPLE_CORPUS:
-                embed_resp = litellm.embedding(model=config.EMBEDDING_MODEL, input=[chunk])
-                vector = embed_resp['data'][0]['embedding']
+                if is_mock_key(config.OPENAI_API_KEY):
+                    vector = generate_mock_embedding(chunk)
+                    logger.info("Using mock embedding for offline mode.")
+                else:
+                    embed_resp = litellm.embedding(model=config.EMBEDDING_MODEL, input=[chunk])
+                    vector = embed_resp['data'][0]['embedding']
 
                 cur.execute(
                     "INSERT INTO document_chunks (content, embedding) VALUES (%s, %s);",

@@ -5,6 +5,7 @@ import litellm
 from typing import List
 from evaluator.config import config
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
+from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding
 
 logger = logging.getLogger("NaiveRAG")
 
@@ -32,8 +33,12 @@ class NaiveRAG(BaseRAGPipeline):
             return ["Fallback: Database connectivity failure context execution placeholder."]
 
     def execute(self, query: str) -> RAGResponse:
-        embed_resp = litellm.embedding(model=self.embedding_model, input=[query])
-        query_vector = embed_resp['data'][0]['embedding']
+        if is_mock_key(config.OPENAI_API_KEY):
+            query_vector = generate_mock_embedding(query)
+            logger.info("Using mock embedding for offline mode.")
+        else:
+            embed_resp = litellm.embedding(model=self.embedding_model, input=[query])
+            query_vector = embed_resp['data'][0]['embedding']
 
         contexts = self._execute_vector_search(query_vector)
 
