@@ -29,6 +29,8 @@ pytest tests/ -v --durations=10                   # run unit tests
 ruff check evaluator/ && ruff format --check evaluator/  # lint & format
 mypy --ignore-missing-imports evaluator/          # static types
 docker compose up --build                         # full stack with pgvector
+streamlit run evaluator/ui.py                     # drift telemetry dashboard
+python scripts/seed_db.py                         # seed pgvector with sample data
 ```
 
 ## Important Details
