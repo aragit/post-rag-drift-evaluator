@@ -3,8 +3,11 @@ import logging
 import litellm
 from typing import List
 from evaluator.config import config
+from evaluator.utils.mock_embedding import is_mock_key
 
 logger = logging.getLogger("MetricsJudge")
+
+MOCK_SCORE = 0.85
 
 def evaluate_faithfulness(query: str, contexts: List[str], answer: str, model: str = config.DEFAULT_MODEL) -> float:
     """Measures if the generated answer is strictly grounded in the provided context (0.0 to 1.0)."""
@@ -18,6 +21,9 @@ def evaluate_faithfulness(query: str, contexts: List[str], answer: str, model: s
     )
     
     try:
+        if is_mock_key(config.OPENAI_API_KEY):
+            logger.info("Using mock score for offline mode.")
+            return MOCK_SCORE
         response = litellm.completion(
             model=model,
             messages=[{"role": "user", "content": prompt}],
@@ -41,6 +47,9 @@ def evaluate_context_precision(query: str, contexts: List[str], model: str = con
     )
     
     try:
+        if is_mock_key(config.OPENAI_API_KEY):
+            logger.info("Using mock score for offline mode.")
+            return MOCK_SCORE
         response = litellm.completion(
             model=model,
             messages=[{"role": "user", "content": prompt}],

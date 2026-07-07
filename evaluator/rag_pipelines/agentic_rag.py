@@ -6,7 +6,7 @@ import json
 from typing import List
 from evaluator.config import config
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
-from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding
+from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding, generate_mock_completion
 
 logger = logging.getLogger("AgenticRAG")
 
@@ -39,11 +39,15 @@ class AgenticRAG(BaseRAGPipeline):
             f"Deconstruct this complex user query into exactly two distinct sub-queries "
             f"for optimization. Return as a raw JSON array of strings only. Query: {query}"
         )
-        response = litellm.completion(
-            model=self.model_name,
-            messages=[{"role": "user", "content": planner_prompt}],
-            response_format={"type": "json_object"}
-        )
+        if is_mock_key(config.OPENAI_API_KEY):
+            response = generate_mock_completion(planner_prompt, response_format="json")
+            logger.info("Using mock completion for offline mode.")
+        else:
+            response = litellm.completion(
+                model=self.model_name,
+                messages=[{"role": "user", "content": planner_prompt}],
+                response_format={"type": "json_object"}
+            )
         try:
             content = response.choices[0].message.content
             parsed = json.loads(content)
@@ -78,10 +82,14 @@ class AgenticRAG(BaseRAGPipeline):
             f"{chr(10).join(all_contexts)}\n\nOriginal Intent: {query}"
         )
 
-        response = litellm.completion(
-            model=self.model_name,
-            messages=[{"role": "user", "content": synthesis_prompt}]
-        )
+        if is_mock_key(config.OPENAI_API_KEY):
+            response = generate_mock_completion(synthesis_prompt)
+            logger.info("Using mock completion for offline mode.")
+        else:
+            response = litellm.completion(
+                model=self.model_name,
+                messages=[{"role": "user", "content": synthesis_prompt}]
+            )
         answer = response.choices[0].message.content
 
         return RAGResponse(

@@ -5,7 +5,7 @@ import litellm
 from typing import List
 from evaluator.config import config
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
-from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding
+from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding, generate_mock_completion
 
 logger = logging.getLogger("NaiveRAG")
 
@@ -45,10 +45,14 @@ class NaiveRAG(BaseRAGPipeline):
         formatted_context = "\n".join(contexts)
         prompt = f"Answer the query using ONLY the context provided.\nContext:\n{formatted_context}\n\nQuery: {query}"
 
-        response = litellm.completion(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}]
-        )
+        if is_mock_key(config.OPENAI_API_KEY):
+            response = generate_mock_completion(prompt)
+            logger.info("Using mock completion for offline mode.")
+        else:
+            response = litellm.completion(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}]
+            )
         answer = response.choices[0].message.content
 
         return RAGResponse(
