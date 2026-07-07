@@ -21,7 +21,8 @@ monitor = DriftMonitor(threshold=threshold)
 
 np.random.seed(42)
 base_arr = np.random.normal(0, 1, (100, 128))
-curr_arr = np.random.normal(0.2, 1.1, (100, 128))
+rng_drift = np.random.RandomState(99)
+curr_arr = base_arr + rng_drift.normal(0, 0.10, (100, 128))
 
 df_base = pl.DataFrame({"embedding": base_arr.tolist()})
 df_curr = pl.DataFrame({"embedding": curr_arr.tolist()})
