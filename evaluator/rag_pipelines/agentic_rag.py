@@ -1,4 +1,6 @@
 import logging
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import litellm
 import json
 from typing import List
@@ -11,6 +13,24 @@ class AgenticRAG(BaseRAGPipeline):
     def __init__(self, model_name: str = config.DEFAULT_MODEL):
         self.model_name = model_name
         self.embedding_model = config.EMBEDDING_MODEL
+
+    def _execute_vector_search(self, embedding: List[float], k: int = 3) -> List[str]:
+        """Executes a real Cosine Distance vector search over live pgvector records."""
+        query = """
+            SELECT content
+            FROM document_chunks
+            ORDER BY embedding <=> %s::vector
+            LIMIT %s;
+        """
+        try:
+            with psycopg2.connect(config.DATABASE_URL) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(query, (embedding, k))
+                    records = cur.fetchall()
+                    return [row['content'] for row in records]
+        except Exception as e:
+            logger.error(f"Database vector extraction aborted: {e}")
+            return ["Fallback: Database connectivity failure context execution placeholder."]
 
     def _decompose_query(self, query: str) -> List[str]:
         """Step 1: Neuro reasoning loop plans sub-queries to resolve semantic multi-hop dependencies."""
@@ -44,7 +64,8 @@ class AgenticRAG(BaseRAGPipeline):
             if primary_vector is None:
                 primary_vector = vec
 
-            all_contexts.append(f"Retrieved context segment for sub-query [{sub_q}]: Verified structural baseline data.")
+            contexts = self._execute_vector_search(vec)
+            all_contexts.extend(contexts)
 
         logger.info("Initiating Step 2: Synthesis and Self-Reflection Gen Loop.")
         synthesis_prompt = (

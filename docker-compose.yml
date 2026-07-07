@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rag_vector_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: rag_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_secure_password_2026
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rag_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  evaluator:
+    build:
+      context: .
+      target: runtime
+    container_name: rag_drift_evaluator
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres_secure_password_2026@db:5432/rag_db
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - DEFAULT_MODEL=gemma-3n-it
+      - EMBEDDING_MODEL=text-embedding-3-small
+    volumes:
+      - .:/app
+
+volumes:
+  pgdata:

@@ -1,0 +1,58 @@
+name: Infrastructure CI Gate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: rag_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_secure_password_2026
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Linting & Test Matrix Tooling
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff mypy pytest pytest-mock
+        pip install -r requirements.txt
+
+    - name: Run Ruff Linter & Formatter (Deterministic Check)
+      run: |
+        ruff check evaluator/
+        ruff format --check evaluator/
+
+    - name: Static Type Verification via Mypy
+      run: |
+        mypy --ignore-missing-imports evaluator/
+
+    - name: Execute Test Suite
+      env:
+        DATABASE_URL: postgresql://postgres:postgres_secure_password_2026@localhost:5432/rag_db
+        LITELLM_MASTER_KEY: sk-mock-key-1234
+      run: |
+        pytest tests/ -v --durations=10
