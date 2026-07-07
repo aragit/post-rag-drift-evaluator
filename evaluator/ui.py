@@ -2,6 +2,7 @@ import streamlit as st
 import polars as pl
 import numpy as np
 from sklearn.decomposition import PCA
+from evaluator.config import config
 from evaluator.drift_monitor import DriftMonitor
 
 st.set_page_config(page_title="Post-RAG Drift Evaluator", page_icon="📊", layout="wide")

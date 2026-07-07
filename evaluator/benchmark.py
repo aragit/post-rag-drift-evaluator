@@ -2,6 +2,7 @@ import time
 import argparse
 import logging
 import polars as pl
+from evaluator.config import config
 from evaluator.rag_pipelines.naive_rag import NaiveRAG
 from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.utils.metrics import evaluate_faithfulness, evaluate_context_precision
