@@ -171,7 +171,10 @@ class DriftMonitor:
         pca = PCA(n_components=1)
         with np.errstate(invalid="ignore", divide="ignore"):
             reduced = pca.fit_transform(embeddings).flatten()
-        hist, _ = np.histogram(reduced, bins=bins, density=True)
+        if np.ptp(reduced) == 0:
+            hist = np.ones(bins) / bins
+        else:
+            hist, _ = np.histogram(reduced, bins=bins, density=True)
         prob_dist = hist + 1e-12
         return prob_dist / np.sum(prob_dist)
 
