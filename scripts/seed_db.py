@@ -1,9 +1,11 @@
 import argparse
-import psycopg2
+
 import litellm
+import psycopg2
+
 from evaluator.config import config
-from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding
 from evaluator.logging_config import get_logger, setup_logging
+from evaluator.utils.mock_embedding import generate_mock_embedding, is_mock_key
 
 setup_logging()
 logger = get_logger("DBSeeder")

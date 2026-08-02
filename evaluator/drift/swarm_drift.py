@@ -12,7 +12,8 @@ baseline and a current window:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -21,10 +22,10 @@ from evaluator.schemas.telemetry import ExecutionMetadataPayload
 
 logger = get_logger("SwarmDriftCalculator")
 
-SwarmMeta = Union[ExecutionMetadataPayload, Dict[str, Any]]
+SwarmMeta = ExecutionMetadataPayload | dict[str, Any]
 
 
-def _agent_hops(payload: SwarmMeta) -> List[str]:
+def _agent_hops(payload: SwarmMeta) -> list[str]:
     if isinstance(payload, dict):
         return payload.get("agent_hops") or []
     return payload.agent_hops or []
@@ -36,7 +37,7 @@ def _reflection_iterations(payload: SwarmMeta) -> int:
     return int(payload.reflection_iterations or 0)
 
 
-def _transition_matrix(payloads: Sequence[SwarmMeta], agents: List[str]) -> np.ndarray:
+def _transition_matrix(payloads: Sequence[SwarmMeta], agents: list[str]) -> np.ndarray:
     index = {agent: i for i, agent in enumerate(agents)}
     matrix = np.zeros((len(agents), len(agents)), dtype=float)
     for payload in payloads:
@@ -69,13 +70,13 @@ class SwarmDriftCalculator:
         self,
         baseline_metadata: Sequence[SwarmMeta],
         current_metadata: Sequence[SwarmMeta],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compute swarm-level drift between two groups of execution traces.
 
         Returns ``transition_entropy_delta``,
         ``avg_reflection_iterations_delta``, and ``is_swarm_drifted``.
         """
-        agents: List[str] = []
+        agents: list[str] = []
         seen: set[str] = set()
         for payload in [*baseline_metadata, *current_metadata]:
             for hop in _agent_hops(payload):

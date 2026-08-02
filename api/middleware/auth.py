@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 from fastapi import HTTPException, Request
 from starlette.status import HTTP_401_UNAUTHORIZED
@@ -16,7 +15,7 @@ def _is_public_path(path: str) -> bool:
     return path in HEALTH_PATHS or path == METRICS_PATH
 
 
-def verify_api_key(request: Request) -> Optional[str]:
+def verify_api_key(request: Request) -> str | None:
     """FastAPI dependency: verify the request carries a valid API key.
 
     Reads the key from the ``X-API-Key`` header or an
@@ -27,7 +26,7 @@ def verify_api_key(request: Request) -> Optional[str]:
     if not config.API_KEY_REQUIRED or _is_public_path(request.url.path):
         return None
 
-    api_key: Optional[str] = request.headers.get("X-API-Key")
+    api_key: str | None = request.headers.get("X-API-Key")
     if not api_key:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):

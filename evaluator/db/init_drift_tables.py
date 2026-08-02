@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Optional
 
 import asyncpg
 
@@ -27,7 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_timestamp ON telemetry_evaluations(time
 """
 
 
-async def init_drift_tables(pool: Optional[asyncpg.Pool] = None) -> None:
+async def init_drift_tables(pool: asyncpg.Pool | None = None) -> None:
     """Ensure the telemetry evaluation schema exists in PostgreSQL.
 
     Uses the shared asyncpg pool from ``evaluator.db.pool`` unless an

@@ -1,6 +1,7 @@
-import numpy as np
 import hashlib
-from typing import Any, List
+from typing import Any
+
+import numpy as np
 
 
 class MockMessage:
@@ -29,7 +30,7 @@ def is_mock_key(key: str | None) -> bool:
     return key.startswith("sk-your-") or key.startswith("sk-mock-key")
 
 
-def generate_mock_embedding(text: str, dim: int = 1536) -> List[float]:
+def generate_mock_embedding(text: str, dim: int = 1536) -> list[float]:
     """Generate a deterministic mock embedding based on text hash.
 
     Uses MD5 hash of input text as seed for reproducible embeddings.
@@ -72,7 +73,7 @@ def generate_mock_completion(
     return MockCompletionResponse(content)
 
 
-def generate_random_embedding(dim: int = 1536) -> List[float]:
+def generate_random_embedding(dim: int = 1536) -> list[float]:
     """Generate a random mock embedding (non-deterministic)."""
     vec = np.random.randn(dim).astype(np.float32)
     vec = vec / np.linalg.norm(vec)

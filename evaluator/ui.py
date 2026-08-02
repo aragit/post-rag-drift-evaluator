@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional, Tuple
 
 import asyncpg
 import polars as pl
@@ -20,10 +19,10 @@ if st.sidebar.button("Refresh", key="refresh_button"):
     st.rerun()
 
 
-def _load_dashboard() -> Tuple[Optional[dict], Optional[pl.DataFrame], bool, list]:
+def _load_dashboard() -> tuple[dict | None, pl.DataFrame | None, bool, list]:
     """Run async store reads on a loop-local pool (safe for Streamlit reruns)."""
 
-    async def _load() -> Tuple[Optional[dict], Optional[pl.DataFrame], bool, list]:
+    async def _load() -> tuple[dict | None, pl.DataFrame | None, bool, list]:
         pool = await asyncpg.create_pool(
             dsn=config.DATABASE_URL, min_size=1, max_size=2
         )

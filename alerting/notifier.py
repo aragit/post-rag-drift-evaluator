@@ -8,7 +8,7 @@ generic HTTP webhook without blocking the evaluation caller.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 
@@ -30,7 +30,7 @@ def _drift_alerts_total():
 class DriftAlertNotifier:
     """Dispatch structured drift alerts to a configured webhook URL."""
 
-    def __init__(self, webhook_url: Optional[str] = None):
+    def __init__(self, webhook_url: str | None = None):
         self.webhook_url = (
             webhook_url
             or os.environ.get("DRIFT_ALERT_WEBHOOK_URL")
@@ -38,8 +38,8 @@ class DriftAlertNotifier:
         )
 
     def build_payload(
-        self, eval_result: Dict[str, Any], batch_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, eval_result: dict[str, Any], batch_id: str | None = None
+    ) -> dict[str, Any]:
         """Build the structured JSON alert payload from an evaluation result."""
         vector = eval_result.get("vector_drift", {})
         graph = eval_result.get("graph_drift", {})
@@ -65,7 +65,7 @@ class DriftAlertNotifier:
         }
 
     async def notify_if_drifted(
-        self, eval_result: Dict[str, Any], batch_id: Optional[str] = None
+        self, eval_result: dict[str, Any], batch_id: str | None = None
     ) -> bool:
         """Dispatch an alert when ``eval_result["is_drifted"]`` is true.
 

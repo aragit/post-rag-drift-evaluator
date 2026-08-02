@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Optional
+from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,7 +41,7 @@ class EvaluatorConfig(BaseSettings):
 
     DRIFT_ALERT_WEBHOOK_URL: str | None = Field(default=None)
 
-    REDIS_URL: Optional[str] = Field(default=None)
+    REDIS_URL: str | None = Field(default=None)
     REDIS_STREAM_KEY: str = Field(default="telemetry:frames:stream")
     REDIS_CONSUMER_GROUP: str = Field(default="drift_engine_workers")
     REDIS_CONSUMER_NAME: str = Field(default="worker_1")
@@ -53,8 +53,8 @@ class EvaluatorConfig(BaseSettings):
     ANTHROPIC_API_KEY: str | None = Field(default=None)
 
     API_KEY_REQUIRED: bool = Field(default=False)
-    API_KEYS: List[str] = Field(default_factory=list)
-    CORS_ORIGINS: List[str] = Field(default=["*"])
+    API_KEYS: list[str] = Field(default_factory=list)
+    CORS_ORIGINS: list[str] = Field(default=["*"])
     RATE_LIMIT_PER_MINUTE: int = Field(default=600)
 
     model_config = SettingsConfigDict(

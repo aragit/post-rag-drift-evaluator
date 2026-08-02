@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 from alerting.notifier import DriftAlertNotifier
@@ -14,7 +14,7 @@ from evaluator.schemas.telemetry import (
     RetrievalContextPayload,
 )
 
-DRIFTED_RESULT: Dict[str, Any] = {
+DRIFTED_RESULT: dict[str, Any] = {
     "vector_drift": {
         "js_divergence": 0.42,
         "mmd_score": 0.31,
@@ -34,7 +34,7 @@ DRIFTED_RESULT: Dict[str, Any] = {
     "is_drifted": True,
 }
 
-STABLE_RESULT: Dict[str, Any] = {
+STABLE_RESULT: dict[str, Any] = {
     **DRIFTED_RESULT,
     "is_drifted": False,
     "graph_drift": {**DRIFTED_RESULT["graph_drift"], "is_graph_drifted": False},
@@ -62,7 +62,7 @@ CYCLE_GRAPH = {
 
 
 class FakeRepo:
-    def __init__(self, stats: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, stats: dict[str, Any] | None = None) -> None:
         self.stats = stats or {
             "total_frames": 12,
             "by_rag_type": {"naive": 6, "graph_rag": 4, "swarm": 2},
@@ -70,46 +70,46 @@ class FakeRepo:
             "frames_with_swarm_metadata": 2,
             "status": "healthy",
         }
-        self.recent: List[RAGEvaluationFrame] = []
-        self.recorded: List[RAGEvaluationFrame] = []
+        self.recent: list[RAGEvaluationFrame] = []
+        self.recorded: list[RAGEvaluationFrame] = []
 
-    async def get_store_stats(self) -> Dict[str, Any]:
+    async def get_store_stats(self) -> dict[str, Any]:
         return self.stats
 
     async def get_recent_frames(
-        self, rag_type: Optional[str] = None, limit: int = 100
-    ) -> List[RAGEvaluationFrame]:
+        self, rag_type: str | None = None, limit: int = 100
+    ) -> list[RAGEvaluationFrame]:
         return self.recent
 
     async def record_evaluation(
-        self, frame: RAGEvaluationFrame, metrics: Dict[str, Any]
+        self, frame: RAGEvaluationFrame, metrics: dict[str, Any]
     ) -> None:
         self.recorded.append(frame)
 
 
 class FakeNotifier:
-    def __init__(self, webhook_url: Optional[str] = None):
+    def __init__(self, webhook_url: str | None = None):
         self.webhook_url = webhook_url
-        self.dispatched: List[Dict[str, Any]] = []
+        self.dispatched: list[dict[str, Any]] = []
 
     async def notify_if_drifted(
-        self, eval_result: Dict[str, Any], batch_id: Optional[str] = None
+        self, eval_result: dict[str, Any], batch_id: str | None = None
     ) -> bool:
         self.dispatched.append({"eval_result": eval_result, "batch_id": batch_id})
         return True
 
     def build_payload(
-        self, eval_result: Dict[str, Any], batch_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, eval_result: dict[str, Any], batch_id: str | None = None
+    ) -> dict[str, Any]:
         return {"event": "drift_alert", "is_drifted": True, "batch_id": batch_id}
 
 
 def _frame(
     *,
-    embedding: Optional[List[float]] = None,
+    embedding: list[float] | None = None,
     rag_type: str = "naive",
-    graph: Optional[Dict[str, Any]] = None,
-    agent_hops: Optional[List[str]] = None,
+    graph: dict[str, Any] | None = None,
+    agent_hops: list[str] | None = None,
 ) -> RAGEvaluationFrame:
     return RAGEvaluationFrame(
         query=QueryPayload(text="test query", embedding=embedding),

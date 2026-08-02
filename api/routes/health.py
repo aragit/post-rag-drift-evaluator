@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -13,13 +13,13 @@ router = APIRouter()
 
 
 @router.get("/healthz", tags=["health"])
-async def healthz() -> Dict[str, str]:
+async def healthz() -> dict[str, str]:
     """Liveness probe — the process is alive as long as this responds."""
     return {"status": "alive"}
 
 
 @router.get("/readyz", tags=["health"])
-async def readyz(request: Request) -> Dict[str, Any]:
+async def readyz(request: Request) -> dict[str, Any]:
     """Readiness probe — verifies DB pool reachability and buffer state."""
     db_ok = False
     db_error: str | None = None

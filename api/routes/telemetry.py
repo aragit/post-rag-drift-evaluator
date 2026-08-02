@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 
-from api.middleware.auth import verify_api_key
-from api.middleware.rate_limit import rate_limit
 from api.metrics import (
     DRIFT_SCORE_GAUGE,
     EVALUATION_LATENCY_SECONDS,
     FRAME_INGESTION_TOTAL,
 )
+from api.middleware.auth import verify_api_key
+from api.middleware.rate_limit import rate_limit
 from evaluator.schemas.telemetry import RAGEvaluationFrame
 
 router = APIRouter(
@@ -25,20 +25,20 @@ DEFAULT_BASELINE_LIMIT = 100
 
 
 class IngestFramesPayload(BaseModel):
-    frames: List[RAGEvaluationFrame]
+    frames: list[RAGEvaluationFrame]
 
 
 class EvaluateRequestPayload(BaseModel):
-    baseline_batch_id: Optional[str] = None
-    baseline_frames: Optional[List[RAGEvaluationFrame]] = None
-    current_frames: List[RAGEvaluationFrame]
+    baseline_batch_id: str | None = None
+    baseline_frames: list[RAGEvaluationFrame] | None = None
+    current_frames: list[RAGEvaluationFrame]
 
 
 @router.post("/frames", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_frames(
     request: Request,
-    payload: Union[IngestFramesPayload, RAGEvaluationFrame],
-) -> Dict[str, Any]:
+    payload: IngestFramesPayload | RAGEvaluationFrame,
+) -> dict[str, Any]:
     """Ingest one or many ``RAGEvaluationFrame`` objects asynchronously.
 
     Frames are enqueued onto the app's ``AsyncIngestionBuffer`` and
@@ -58,7 +58,7 @@ async def ingest_frames(
 async def evaluate_telemetry(
     request: Request,
     payload: EvaluateRequestPayload,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run multi-modal drift evaluation over the provided frame windows.
 
     Baseline frames come from ``baseline_frames`` when supplied, otherwise
@@ -93,7 +93,7 @@ async def evaluate_telemetry(
     return result
 
 
-def _update_drift_gauges(result: Dict[str, Any]) -> None:
+def _update_drift_gauges(result: dict[str, Any]) -> None:
     vector = result.get("vector_drift", {})
     graph = result.get("graph_drift", {})
     swarm = result.get("swarm_drift", {})

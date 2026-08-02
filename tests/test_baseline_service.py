@@ -1,15 +1,16 @@
+from unittest.mock import AsyncMock
+
 import numpy as np
 import pytest
-from unittest.mock import AsyncMock
 
 from evaluator.baseline_service import DynamicBaselineService
 from evaluator.config import config
 from evaluator.drift_monitor import DriftMonitor
 from evaluator.schemas.telemetry import (
     ExecutionMetadataPayload,
+    OutputPayload,
     QueryPayload,
     RAGEvaluationFrame,
-    OutputPayload,
     RetrievalContextPayload,
 )
 

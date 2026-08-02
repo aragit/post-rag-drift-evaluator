@@ -7,7 +7,6 @@ from api.middleware.rate_limit import reset_rate_limits
 from evaluator.config import config
 from tests.test_api_ingestion import FakeRepo, _frame, _frame_json, api_client
 
-
 # --- Auth tests ---
 
 

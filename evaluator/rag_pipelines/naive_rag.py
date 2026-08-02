@@ -1,16 +1,16 @@
 import litellm
-from typing import List
+
+from evaluator.cache import EmbeddingCache, ResultCache
 from evaluator.config import config
 from evaluator.db.pool import acquire, release
+from evaluator.logging_config import get_logger
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
 from evaluator.utils.mock_embedding import (
-    is_mock_key,
-    generate_mock_embedding,
     generate_mock_completion,
+    generate_mock_embedding,
+    is_mock_key,
 )
 from evaluator.utils.retry import call_with_retry
-from evaluator.logging_config import get_logger
-from evaluator.cache import EmbeddingCache, ResultCache
 
 logger = get_logger("NaiveRAG")
 
@@ -23,8 +23,8 @@ class NaiveRAG(BaseRAGPipeline):
         self._result_cache = ResultCache()
 
     async def _execute_vector_search(
-        self, embedding: List[float], k: int = 3
-    ) -> List[str]:
+        self, embedding: list[float], k: int = 3
+    ) -> list[str]:
         query = """
             SELECT content
             FROM document_chunks

@@ -1,13 +1,14 @@
 import logging
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import litellm
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     stop_after_delay,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 logger = logging.getLogger("Retry")

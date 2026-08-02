@@ -1,17 +1,17 @@
-import pytest
 from contextlib import asynccontextmanager
 from unittest.mock import patch
 
 import asyncpg
-import polars as pl
 import numpy as np
+import polars as pl
+import pytest
 
+from evaluator.alerts import AlertManager
 from evaluator.config import config
-from evaluator.rag_pipelines.naive_rag import NaiveRAG
-from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.drift_monitor import DriftMonitor
 from evaluator.drift_store import DriftStore
-from evaluator.alerts import AlertManager
+from evaluator.rag_pipelines.agentic_rag import AgenticRAG
+from evaluator.rag_pipelines.naive_rag import NaiveRAG
 
 
 @asynccontextmanager

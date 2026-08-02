@@ -1,7 +1,7 @@
 import numpy as np
+import polars as pl
 
 from evaluator.drift_monitor import DriftMonitor
-import polars as pl
 
 
 def test_jsd_is_symmetric():

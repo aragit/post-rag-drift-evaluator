@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from evaluator.schemas.telemetry import (
@@ -25,12 +26,12 @@ __all__ = [
 
 class RAGResponse(BaseModel):
     query: str
-    retrieved_contexts: List[str]
+    retrieved_contexts: list[str]
     generated_answer: str
-    query_embedding: List[float]
+    query_embedding: list[float]
     reflection_iterations: int = 0
     final_confidence: float = 0.0
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class BaseRAGPipeline(ABC):

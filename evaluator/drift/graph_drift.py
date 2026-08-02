@@ -10,7 +10,8 @@ GraphRAG system between a baseline and a current window:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 from scipy.linalg import eigh
@@ -20,22 +21,22 @@ from evaluator.schemas.telemetry import GraphTopologyPayload
 
 logger = get_logger("GraphDriftCalculator")
 
-GraphLike = Union[GraphTopologyPayload, Dict[str, Any]]
+GraphLike = GraphTopologyPayload | dict[str, Any]
 
 
-def _node_list(payload: GraphLike) -> List[Dict[str, Any]]:
+def _node_list(payload: GraphLike) -> list[dict[str, Any]]:
     if isinstance(payload, dict):
         return payload.get("nodes", []) or []
     return payload.nodes or []
 
 
-def _edge_list(payload: GraphLike) -> List[Dict[str, Any]]:
+def _edge_list(payload: GraphLike) -> list[dict[str, Any]]:
     if isinstance(payload, dict):
         return payload.get("edges", []) or []
     return payload.edges or []
 
 
-def _edge_endpoints(edge: Dict[str, Any]) -> Tuple[str, str]:
+def _edge_endpoints(edge: dict[str, Any]) -> tuple[str, str]:
     source = edge.get("source")
     target = edge.get("target")
     if source is None:
@@ -53,11 +54,11 @@ def _graph_density(num_nodes: int, num_edges: int) -> float:
 
 def _pooled_graph(
     payloads: Sequence[GraphLike],
-) -> Tuple[int, int, np.ndarray]:
+) -> tuple[int, int, np.ndarray]:
     """Merge a group of graph payloads into a single pooled graph."""
-    nodes: List[str] = []
+    nodes: list[str] = []
     seen: set[str] = set()
-    edge_pairs: set[Tuple[str, str]] = set()
+    edge_pairs: set[tuple[str, str]] = set()
 
     for payload in payloads:
         for node in _node_list(payload):
@@ -124,7 +125,7 @@ class GraphDriftCalculator:
         self,
         baseline_graphs: Sequence[GraphLike],
         current_graphs: Sequence[GraphLike],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compute graph-topology drift between two groups of sub-graphs.
 
         Returns ``spectral_distance``, ``density_delta``,

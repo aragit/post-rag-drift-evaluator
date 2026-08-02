@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Optional
 
 import asyncpg
 
@@ -8,7 +7,7 @@ from evaluator.config import config
 
 logger = logging.getLogger("DBPool")
 
-_pool: Optional[asyncpg.Pool] = None
+_pool: asyncpg.Pool | None = None
 _pool_lock = asyncio.Lock()
 
 

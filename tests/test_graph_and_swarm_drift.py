@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import AsyncMock
 
 from evaluator.drift import GraphDriftCalculator, SwarmDriftCalculator
@@ -55,10 +55,10 @@ PATH_GRAPH = {
 
 def _frame(
     *,
-    embedding: Optional[List[float]] = None,
+    embedding: list[float] | None = None,
     rag_type: str = "naive",
-    graph: Optional[Dict[str, Any]] = None,
-    agent_hops: Optional[List[str]] = None,
+    graph: dict[str, Any] | None = None,
+    agent_hops: list[str] | None = None,
     reflection_iterations: int = 0,
 ) -> RAGEvaluationFrame:
     return RAGEvaluationFrame(

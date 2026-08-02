@@ -1,9 +1,10 @@
+from typing import Any
+
 import numpy as np
 import polars as pl
 from scipy.spatial.distance import cdist, jensenshannon, pdist, squareform
 from scipy.stats import gaussian_kde
 from sklearn.decomposition import PCA
-from typing import Any, Dict, List, Optional, Tuple
 
 from alerting.notifier import DriftAlertNotifier
 from evaluator.config import config
@@ -21,24 +22,24 @@ class DriftMonitor:
         self,
         threshold: float = config.DRIFT_THRESHOLD,
         store: DriftStore | None = None,
-        notifier: Optional[DriftAlertNotifier] = None,
-        baseline_service: Optional[object] = None,
+        notifier: DriftAlertNotifier | None = None,
+        baseline_service: object | None = None,
     ):
         self.threshold = threshold
         self.mmd_threshold = config.MMD_THRESHOLD
         self.per_component_kl_threshold = config.PER_COMPONENT_KL_THRESHOLD
-        self.calibrated_thresholds: Dict[str, float] = {}
+        self.calibrated_thresholds: dict[str, float] = {}
         self._calibrated = False
         self._store = store or DriftStore()
         self.notifier = notifier
         self._graph_calculator = GraphDriftCalculator()
         self._swarm_calculator = SwarmDriftCalculator()
         self._baseline_service = baseline_service
-        self._saved_thresholds: Optional[Dict[str, Any]] = None
+        self._saved_thresholds: dict[str, Any] | None = None
 
     def calibrate_thresholds(
         self, baseline_embeddings: np.ndarray, n_bootstrap: int = 1000
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         baseline_embeddings = np.atleast_2d(baseline_embeddings)
         n_samples = baseline_embeddings.shape[0]
 
@@ -181,7 +182,7 @@ class DriftMonitor:
         baseline_df: pl.DataFrame,
         current_df: pl.DataFrame,
         embedding_col: str = "embedding",
-    ) -> Tuple[float, bool]:
+    ) -> tuple[float, bool]:
         baseline_matrix = self._extract_embeddings(baseline_df, embedding_col)
         current_matrix = self._extract_embeddings(current_df, embedding_col)
 
@@ -205,7 +206,7 @@ class DriftMonitor:
         baseline_df: pl.DataFrame,
         current_df: pl.DataFrame,
         embedding_col: str = "embedding",
-    ) -> Tuple[float, float, bool]:
+    ) -> tuple[float, float, bool]:
         baseline_matrix = self._extract_embeddings(baseline_df, embedding_col)
         current_matrix = self._extract_embeddings(current_df, embedding_col)
 
@@ -283,7 +284,7 @@ class DriftMonitor:
         baseline_df: pl.DataFrame,
         current_df: pl.DataFrame,
         embedding_col: str = "embedding",
-    ) -> Tuple[float, float, bool]:
+    ) -> tuple[float, float, bool]:
         baseline_matrix = self._extract_embeddings(baseline_df, embedding_col)
         current_matrix = self._extract_embeddings(current_df, embedding_col)
 
@@ -342,7 +343,7 @@ class DriftMonitor:
 
         return max_kl, mean_kl, is_drifted
 
-    async def trend_analysis(self, hours: int = 24, window: int = 30) -> Dict[str, Any]:
+    async def trend_analysis(self, hours: int = 24, window: int = 30) -> dict[str, Any]:
         history = await self._store.get_recent_history(hours=hours)
         trend = await self._store.get_trend(window=window)
         anomaly = await self._store.detect_anomaly(window=window)
@@ -357,7 +358,7 @@ class DriftMonitor:
         baseline_df: pl.DataFrame,
         current_df: pl.DataFrame,
         embedding_col: str = "embedding",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         js_score, js_drifted = self.compute_jensen_shannon_drift(
             baseline_df, current_df, embedding_col
         )
@@ -388,8 +389,8 @@ class DriftMonitor:
 
     @staticmethod
     def _collect_vector_embeddings(
-        frames: List[RAGEvaluationFrame],
-    ) -> Optional[np.ndarray]:
+        frames: list[RAGEvaluationFrame],
+    ) -> np.ndarray | None:
         vectors = []
         for frame in frames:
             embedding = frame.query.embedding
@@ -405,9 +406,9 @@ class DriftMonitor:
 
     def _evaluate_vector_drift(
         self,
-        baseline_frames: List[RAGEvaluationFrame],
-        current_frames: List[RAGEvaluationFrame],
-    ) -> Dict[str, Any]:
+        baseline_frames: list[RAGEvaluationFrame],
+        current_frames: list[RAGEvaluationFrame],
+    ) -> dict[str, Any]:
         result = {
             "js_divergence": 0.0,
             "mmd_score": 0.0,
@@ -443,9 +444,9 @@ class DriftMonitor:
 
     def _evaluate_graph_drift(
         self,
-        baseline_frames: List[RAGEvaluationFrame],
-        current_frames: List[RAGEvaluationFrame],
-    ) -> Dict[str, Any]:
+        baseline_frames: list[RAGEvaluationFrame],
+        current_frames: list[RAGEvaluationFrame],
+    ) -> dict[str, Any]:
         baseline_graphs = [
             frame.context.graph_topology
             for frame in baseline_frames
@@ -469,9 +470,9 @@ class DriftMonitor:
 
     def _evaluate_swarm_drift(
         self,
-        baseline_frames: List[RAGEvaluationFrame],
-        current_frames: List[RAGEvaluationFrame],
-    ) -> Dict[str, Any]:
+        baseline_frames: list[RAGEvaluationFrame],
+        current_frames: list[RAGEvaluationFrame],
+    ) -> dict[str, Any]:
         baseline_metadata = [
             frame.metadata
             for frame in baseline_frames
@@ -492,7 +493,7 @@ class DriftMonitor:
             baseline_metadata, current_metadata
         )
 
-    def _apply_calibrated_thresholds(self, thresholds: Dict[str, float]) -> None:
+    def _apply_calibrated_thresholds(self, thresholds: dict[str, float]) -> None:
         if not thresholds:
             return
         self._saved_thresholds = {
@@ -541,9 +542,9 @@ class DriftMonitor:
 
     async def evaluate_frames(
         self,
-        baseline_frames: Optional[List[RAGEvaluationFrame]] = None,
-        current_frames: Optional[List[RAGEvaluationFrame]] = None,
-    ) -> Dict[str, Any]:
+        baseline_frames: list[RAGEvaluationFrame] | None = None,
+        current_frames: list[RAGEvaluationFrame] | None = None,
+    ) -> dict[str, Any]:
         """Evaluate hybrid vector/graph/swarm drift between two windows.
 
         Results are keyed as ``vector_drift``, ``graph_drift``,

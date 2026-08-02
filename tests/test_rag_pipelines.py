@@ -1,9 +1,10 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from evaluator.rag_pipelines.naive_rag import NaiveRAG
+import pytest
+
 from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.rag_pipelines.base import RAGResponse
+from evaluator.rag_pipelines.naive_rag import NaiveRAG
 
 
 @pytest.mark.asyncio

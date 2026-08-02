@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import redis
 
@@ -34,8 +34,8 @@ class AsyncIngestionBuffer:
         self._queue: asyncio.Queue[Any] = asyncio.Queue()
         self._batch_size = max(1, batch_size)
         self._flush_interval = max(0.0, flush_interval)
-        self._worker_task: Optional[asyncio.Task] = None
-        self._repo: Optional[Any] = None
+        self._worker_task: asyncio.Task | None = None
+        self._repo: Any | None = None
         self._stopped = False
 
     @property
@@ -52,7 +52,7 @@ class AsyncIngestionBuffer:
     def buffer_type(self) -> str:
         return "memory"
 
-    async def enqueue(self, frames: List[RAGEvaluationFrame]) -> None:
+    async def enqueue(self, frames: list[RAGEvaluationFrame]) -> None:
         """Push frames onto the buffer. Returns without awaiting persistence."""
         for frame in frames:
             self._queue.put_nowait(frame)
@@ -77,7 +77,7 @@ class AsyncIngestionBuffer:
                 )
             except asyncio.TimeoutError:
                 continue
-            batch: List[RAGEvaluationFrame] = []
+            batch: list[RAGEvaluationFrame] = []
             if first is _STOP:
                 self._stopped = True
             else:
@@ -95,7 +95,7 @@ class AsyncIngestionBuffer:
                 await self._flush(batch)
         logger.info("Ingestion worker stopped.")
 
-    async def _flush(self, frames: List[RAGEvaluationFrame]) -> None:
+    async def _flush(self, frames: list[RAGEvaluationFrame]) -> None:
         if self._repo is None or not frames:
             return
         start = time.monotonic()
@@ -132,9 +132,9 @@ def _make_memory_buffer(
 
 
 def get_ingestion_buffer(
-    settings: Optional[EvaluatorConfig] = None,
+    settings: EvaluatorConfig | None = None,
     repo: Any = None,
-) -> Union[RedisStreamBuffer, AsyncIngestionBuffer]:
+) -> RedisStreamBuffer | AsyncIngestionBuffer:
     """Return a durable Redis Streams buffer when Redis is reachable.
 
     Falls back to the in-memory :class:`AsyncIngestionBuffer` when

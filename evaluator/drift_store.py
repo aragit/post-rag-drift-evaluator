@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import polars as pl
 
@@ -20,7 +20,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
 """
 
 
-def _coerce_frame_payload(raw: Any) -> Optional[Dict[str, Any]]:
+def _coerce_frame_payload(raw: Any) -> dict[str, Any] | None:
     """Parse a stored JSONB telemetry payload, tolerating legacy dicts."""
     if isinstance(raw, str):
         try:
@@ -39,7 +39,7 @@ class DriftStore:
     unless an explicit loop-local pool is injected via ``pool``.
     """
 
-    def __init__(self, pool: Optional[Any] = None):
+    def __init__(self, pool: Any | None = None):
         self._pool = pool
         self._ready = False
 
@@ -49,7 +49,7 @@ class DriftStore:
         await init_drift_tables(pool=self._pool)
         self._ready = True
 
-    async def _connection(self) -> Tuple[Any, bool]:
+    async def _connection(self) -> tuple[Any, bool]:
         await self._ensure_ready()
         if self._pool is not None:
             conn = await self._pool.acquire()
@@ -76,7 +76,7 @@ class DriftStore:
         logger.info("DriftStore released its connection pool.")
 
     async def record_evaluation(
-        self, frame: RAGEvaluationFrame, metrics: Dict[str, Any]
+        self, frame: RAGEvaluationFrame, metrics: dict[str, Any]
     ) -> None:
         """Persist a full telemetry frame alongside calculated drift metrics."""
         conn, owned = await self._connection()
@@ -101,7 +101,7 @@ class DriftStore:
             frame.metadata.rag_type,
         )
 
-    async def batch_store_frames(self, frames: List[RAGEvaluationFrame]) -> None:
+    async def batch_store_frames(self, frames: list[RAGEvaluationFrame]) -> None:
         """Persist multiple raw telemetry frames in a single round trip.
 
         Used by the async ingestion buffer to batch-write ingested frames
@@ -133,8 +133,8 @@ class DriftStore:
         logger.info("Batch persisted %d evaluation frames.", len(frames))
 
     async def get_recent_frames(
-        self, rag_type: Optional[str] = None, limit: int = 100
-    ) -> List[RAGEvaluationFrame]:
+        self, rag_type: str | None = None, limit: int = 100
+    ) -> list[RAGEvaluationFrame]:
         """Retrieve and deserialize historical evaluation frames."""
         conn, owned = await self._connection()
         try:
@@ -163,7 +163,7 @@ class DriftStore:
         finally:
             await self._release(conn, owned)
 
-        frames: List[RAGEvaluationFrame] = []
+        frames: list[RAGEvaluationFrame] = []
         for row in rows:
             raw = row["telemetry_frame"]
             try:
@@ -181,7 +181,7 @@ class DriftStore:
         self,
         hours: int = 24,
         limit: int = 100,
-    ) -> List[RAGEvaluationFrame]:
+    ) -> list[RAGEvaluationFrame]:
         """Fetch evaluation frames within a sliding *hours* window.
 
         Frames are returned oldest-first so they can be used for chronological
@@ -206,7 +206,7 @@ class DriftStore:
         finally:
             await self._release(conn, owned)
 
-        frames: List[RAGEvaluationFrame] = []
+        frames: list[RAGEvaluationFrame] = []
         for row in rows:
             raw = row["telemetry_frame"]
             try:
@@ -221,7 +221,7 @@ class DriftStore:
                 )
         return frames
 
-    async def record_drift(self, drift_result: Dict[str, Any]) -> str:
+    async def record_drift(self, drift_result: dict[str, Any]) -> str:
         """Legacy adapter: persist a distribution-level drift computation.
 
         The full result dict is stored as the JSONB ``telemetry_frame`` so
@@ -268,7 +268,7 @@ class DriftStore:
         finally:
             await self._release(conn, owned)
 
-        data: Dict[str, List[Any]] = {
+        data: dict[str, list[Any]] = {
             "id": [],
             "trace_id": [],
             "rag_type": [],
@@ -296,7 +296,7 @@ class DriftStore:
             data["metadata"].append(json.dumps(payload))
         return pl.DataFrame(data)
 
-    async def get_store_stats(self) -> Dict[str, Any]:
+    async def get_store_stats(self) -> dict[str, Any]:
         """Return high-level store statistics for the CLI diagnostics."""
         conn, owned = await self._connection()
         try:
@@ -334,7 +334,7 @@ class DriftStore:
             "status": "healthy",
         }
 
-    async def get_latest_drift(self) -> Optional[Dict[str, Any]]:
+    async def get_latest_drift(self) -> dict[str, Any] | None:
         conn, owned = await self._connection()
         try:
             row = await conn.fetchrow(

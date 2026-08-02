@@ -1,4 +1,5 @@
 import logging
+
 from prometheus_client import (
     Counter,
     Gauge,

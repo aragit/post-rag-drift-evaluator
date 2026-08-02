@@ -1,9 +1,10 @@
-import pytest
 from unittest.mock import patch
 
-from evaluator.rag_pipelines.naive_rag import NaiveRAG
-from evaluator.rag_pipelines.agentic_rag import AgenticRAG
+import pytest
+
 from evaluator.drift_monitor import DriftMonitor
+from evaluator.rag_pipelines.agentic_rag import AgenticRAG
+from evaluator.rag_pipelines.naive_rag import NaiveRAG
 
 
 @pytest.mark.asyncio
@@ -61,8 +62,8 @@ async def test_agentic_rag_partial_db_failure():
 
 def test_drift_monitor_with_empty_baseline():
     monitor = DriftMonitor()
-    import polars as pl
     import numpy as np
+    import polars as pl
 
     empty_df = pl.DataFrame({"embedding": []})
     current_df = pl.DataFrame({"embedding": np.random.randn(10, 128).tolist()})
@@ -74,8 +75,8 @@ def test_drift_monitor_with_empty_baseline():
 @pytest.mark.asyncio
 async def test_drift_monitor_with_mismatched_dimensions():
     monitor = DriftMonitor()
-    import polars as pl
     import numpy as np
+    import polars as pl
 
     baseline = pl.DataFrame({"embedding": np.random.randn(10, 128).tolist()})
     current = pl.DataFrame({"embedding": np.random.randn(10, 256).tolist()})

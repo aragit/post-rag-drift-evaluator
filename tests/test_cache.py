@@ -2,9 +2,9 @@ import json
 from unittest.mock import MagicMock, patch
 
 from evaluator.cache import EmbeddingCache, ResultCache, _make_key
-from evaluator.rag_pipelines.naive_rag import NaiveRAG
 from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.rag_pipelines.base import RAGResponse
+from evaluator.rag_pipelines.naive_rag import NaiveRAG
 
 
 class TestEmbeddingCache:

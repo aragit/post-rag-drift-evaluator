@@ -1,6 +1,8 @@
-import pytest
 from datetime import datetime
 
+import pytest
+
+from evaluator.rag_pipelines.base import RAGResponse
 from evaluator.schemas.telemetry import (
     ExecutionMetadataPayload,
     GraphTopologyPayload,
@@ -9,7 +11,6 @@ from evaluator.schemas.telemetry import (
     RAGEvaluationFrame,
     RetrievalContextPayload,
 )
-from evaluator.rag_pipelines.base import RAGResponse
 
 
 def _naive_frame() -> RAGEvaluationFrame:

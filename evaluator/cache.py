@@ -25,14 +25,14 @@ class EmbeddingCache:
     ):
         self._redis_url = redis_url
         self._ttl = ttl
-        self._client: Optional[redis.Redis] = None
+        self._client: redis.Redis | None = None
 
     def _get_client(self) -> redis.Redis:
         if self._client is None:
             self._client = redis.from_url(self._redis_url, decode_responses=True)
         return self._client
 
-    def get(self, query_text: str) -> Optional[list[float]]:
+    def get(self, query_text: str) -> list[float] | None:
         key = _make_key("embedding", query_text)
         try:
             raw = self._get_client().get(key)
@@ -60,7 +60,7 @@ class ResultCache:
     ):
         self._redis_url = redis_url
         self._ttl = ttl
-        self._client: Optional[redis.Redis] = None
+        self._client: redis.Redis | None = None
 
     def _get_client(self) -> redis.Redis:
         if self._client is None:

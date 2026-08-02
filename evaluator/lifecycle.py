@@ -1,19 +1,18 @@
 import asyncio
 import logging
 import signal
-from typing import Dict
 
-from prometheus_client import start_http_server, Gauge
+from prometheus_client import Gauge, start_http_server
 
+from evaluator.alerts import AlertManager
 from evaluator.config import config
 from evaluator.db.pool import close_pool, get_pool
 from evaluator.drift_store import DriftStore
-from evaluator.alerts import AlertManager
 
 logger = logging.getLogger("Lifecycle")
 
 shutdown_event = asyncio.Event()
-_metrics_gauges: Dict[str, Gauge] = {}
+_metrics_gauges: dict[str, Gauge] = {}
 
 
 def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
@@ -104,8 +103,9 @@ async def check_health() -> None:
 
 
 async def run_evaluator():
-    from evaluator.benchmark import run_benchmark
     import argparse
+
+    from evaluator.benchmark import run_benchmark
 
     parser = argparse.ArgumentParser(description="Post-RAG Drift Evaluator")
     parser.add_argument("--queries", nargs="+", default=[])

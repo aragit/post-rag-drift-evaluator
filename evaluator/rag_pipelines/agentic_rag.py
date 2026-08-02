@@ -1,17 +1,18 @@
-import litellm
 import json
-from typing import List
+
+import litellm
+
+from evaluator.cache import EmbeddingCache, ResultCache
 from evaluator.config import config
 from evaluator.db.pool import acquire, release
+from evaluator.logging_config import get_logger
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
 from evaluator.utils.mock_embedding import (
-    is_mock_key,
-    generate_mock_embedding,
     generate_mock_completion,
+    generate_mock_embedding,
+    is_mock_key,
 )
 from evaluator.utils.retry import call_with_retry
-from evaluator.logging_config import get_logger
-from evaluator.cache import EmbeddingCache, ResultCache
 
 logger = get_logger("AgenticRAG")
 
@@ -24,8 +25,8 @@ class AgenticRAG(BaseRAGPipeline):
         self._result_cache = ResultCache()
 
     async def _execute_vector_search(
-        self, embedding: List[float], k: int = 3
-    ) -> List[str]:
+        self, embedding: list[float], k: int = 3
+    ) -> list[str]:
         query = """
             SELECT content
             FROM document_chunks
@@ -44,7 +45,7 @@ class AgenticRAG(BaseRAGPipeline):
             if conn is not None:
                 await release(conn)
 
-    async def _decompose_query(self, query: str) -> List[str]:
+    async def _decompose_query(self, query: str) -> list[str]:
         planner_prompt = (
             f"Deconstruct this complex user query into exactly two distinct sub-queries "
             f"for optimization. Return as a raw JSON array of strings only. Query: {query}"
@@ -70,7 +71,7 @@ class AgenticRAG(BaseRAGPipeline):
             return [query, f"Context clarification for {query}"]
 
     async def _reflect_on_answer(
-        self, query: str, answer: str, contexts: List[str]
+        self, query: str, answer: str, contexts: list[str]
     ) -> dict:
         reflection_prompt = (
             f"Evaluate the following synthesized answer against the original query and retrieved contexts.\n"
@@ -107,7 +108,7 @@ class AgenticRAG(BaseRAGPipeline):
                 "confidence_score": 1.0,
             }
 
-    async def _synthesize(self, query: str, contexts: List[str]) -> str:
+    async def _synthesize(self, query: str, contexts: list[str]) -> str:
         synthesis_prompt = (
             f"Synthesize an authoritative response from the following multi-hop contexts:\n"
             f"{chr(10).join(contexts)}\n\nOriginal Intent: {query}"

@@ -1,6 +1,7 @@
-import pytest
-import polars as pl
 import numpy as np
+import polars as pl
+import pytest
+
 from evaluator.drift_monitor import DriftMonitor
 
 

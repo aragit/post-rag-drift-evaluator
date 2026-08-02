@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
@@ -42,7 +42,7 @@ def get_logger(name: str) -> logging.Logger:
 def log_with_context(
     logger: logging.Logger, level: str, msg: str, **kwargs: Any
 ) -> None:
-    extra: Dict[str, Any] = {"correlation_id": correlation_id}
+    extra: dict[str, Any] = {"correlation_id": correlation_id}
     extra.update(kwargs)
 
     log_method = getattr(logger, level, logger.info)

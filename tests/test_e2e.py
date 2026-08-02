@@ -1,5 +1,7 @@
-import polars as pl
 from unittest.mock import patch
+
+import polars as pl
+
 from evaluator.benchmark import run_benchmark
 
 

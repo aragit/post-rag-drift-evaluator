@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, List, Optional
+from typing import Any
 
 import redis
 import redis.asyncio
@@ -29,13 +29,13 @@ class RedisStreamBuffer:
 
     def __init__(
         self,
-        redis_url: Optional[str],
+        redis_url: str | None,
         stream_key: str = "telemetry:frames:stream",
         consumer_group: str = "drift_engine_workers",
         consumer_name: str = "worker_1",
         batch_size: int = 50,
         flush_interval: float = 5.0,
-        client: Optional[redis.asyncio.Redis] = None,
+        client: redis.asyncio.Redis | None = None,
     ):
         self._redis_url = redis_url
         self._stream_key = stream_key
@@ -43,9 +43,9 @@ class RedisStreamBuffer:
         self._consumer_name = consumer_name
         self._batch_size = max(1, batch_size)
         self._flush_interval = max(0.0, flush_interval)
-        self._client: Optional[redis.asyncio.Redis] = client
-        self._worker_task: Optional[asyncio.Task] = None
-        self._repo: Optional[Any] = None
+        self._client: redis.asyncio.Redis | None = client
+        self._worker_task: asyncio.Task | None = None
+        self._repo: Any | None = None
         self._stopped = False
         self._pending = 0
 
@@ -68,7 +68,7 @@ class RedisStreamBuffer:
             self._client = redis.asyncio.from_url(self._redis_url)
         return self._client
 
-    async def enqueue(self, frames: List[RAGEvaluationFrame]) -> None:
+    async def enqueue(self, frames: list[RAGEvaluationFrame]) -> None:
         """Serialize frames to JSON and publish them to the Redis Stream."""
         if not frames:
             return
@@ -143,8 +143,8 @@ class RedisStreamBuffer:
             for _stream_name, messages in response:
                 if not messages:
                     continue
-                frames: List[RAGEvaluationFrame] = []
-                msg_ids: List[str] = []
+                frames: list[RAGEvaluationFrame] = []
+                msg_ids: list[str] = []
                 for msg_id, fields in messages:
                     raw = fields.get("frame") or fields.get(b"frame")
                     if raw is None:
@@ -179,8 +179,8 @@ class RedisStreamBuffer:
 
     async def _flush(
         self,
-        frames: List[RAGEvaluationFrame],
-        msg_ids: List[str],
+        frames: list[RAGEvaluationFrame],
+        msg_ids: list[str],
         client: redis.asyncio.Redis,
     ) -> None:
         if self._repo is None or not frames:

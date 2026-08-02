@@ -2,7 +2,7 @@ import json
 import uuid
 from contextlib import ExitStack
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -21,7 +21,7 @@ from evaluator.schemas.telemetry import (
 class _Row:
     """Minimal stand-in for an ``asyncpg.Record`` supporting ``row["col"]``."""
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     def __getitem__(self, key: str) -> Any:

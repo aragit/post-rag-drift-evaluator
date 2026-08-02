@@ -16,7 +16,7 @@ import argparse
 import asyncio
 import json
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from alerting.notifier import DriftAlertNotifier
 from evaluator.drift_monitor import DriftMonitor
@@ -27,7 +27,7 @@ logger = get_logger("drift_cli")
 
 DEFAULT_WINDOW_LIMIT = 50
 
-TEST_ALERT_PAYLOAD: Dict[str, Any] = {
+TEST_ALERT_PAYLOAD: dict[str, Any] = {
     "is_drifted": True,
     "vector_drift": {"js_divergence": 0.42, "mmd_score": 0.31},
     "graph_drift": {
@@ -149,7 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     handler = args.handler

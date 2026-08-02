@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,10 +19,10 @@ class GraphTopologyPayload(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    nodes: List[Dict[str, Any]]
-    edges: List[Dict[str, Any]]
-    density: Optional[float] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    density: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class QueryPayload(BaseModel):
@@ -31,7 +31,7 @@ class QueryPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     text: str
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
 
 
 class RetrievalContextPayload(BaseModel):
@@ -39,9 +39,9 @@ class RetrievalContextPayload(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    text_chunks: List[str]
-    dense_embeddings: Optional[List[List[float]]] = None
-    graph_topology: Optional[GraphTopologyPayload] = None
+    text_chunks: list[str]
+    dense_embeddings: list[list[float]] | None = None
+    graph_topology: GraphTopologyPayload | None = None
 
 
 class ExecutionMetadataPayload(BaseModel):
@@ -50,10 +50,10 @@ class ExecutionMetadataPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     rag_type: Literal["naive", "agentic", "graph_rag", "swarm", "custom"]
-    agent_hops: Optional[List[str]] = None
+    agent_hops: list[str] | None = None
     reflection_iterations: int = 0
-    latency_ms: Optional[float] = None
-    extra: Dict[str, Any] = Field(default_factory=dict)
+    latency_ms: float | None = None
+    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class OutputPayload(BaseModel):
@@ -62,8 +62,8 @@ class OutputPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     generated_answer: str
-    response_embedding: Optional[List[float]] = None
-    confidence_score: Optional[float] = None
+    response_embedding: list[float] | None = None
+    confidence_score: float | None = None
 
 
 class RAGEvaluationFrame(BaseModel):

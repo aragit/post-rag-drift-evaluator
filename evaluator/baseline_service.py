@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
-from .drift_store import DriftStore
 from .config import config
+from .drift_store import DriftStore
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +26,14 @@ class DynamicBaselineService:
     thresholds.
     """
 
-    def __init__(self, store: Optional[DriftStore] = None) -> None:
+    def __init__(self, store: DriftStore | None = None) -> None:
         self._store = store
 
     async def fetch_sliding_baseline_frames(
         self,
         window_hours: int = DEFAULT_WINDOW_HOURS,
         limit: int = DEFAULT_BASELINE_LIMIT,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Retrieve frames for the configured sliding time window."""
         if self._store is None:
             logger.debug("No DriftStore injected; returning empty baseline.")
@@ -44,10 +44,10 @@ class DynamicBaselineService:
 
     def compute_calibrated_thresholds(
         self,
-        baseline_frames: List[Any],
+        baseline_frames: list[Any],
         k_sigma: float = DEFAULT_K_SIGMA,
         iterations: int = DEFAULT_BOOTSTRAP_ITERS,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Bootstrap-calibrate thresholds from intra-baseline splits.
 
         Returns a dict with keys ``vector_jsd_threshold``,
@@ -68,10 +68,10 @@ class DynamicBaselineService:
 
         monitor = DriftMonitor(store=self._store, notifier=None)
 
-        jsd_values: List[float] = []
-        mmd_values: List[float] = []
-        spectral_values: List[float] = []
-        entropy_values: List[float] = []
+        jsd_values: list[float] = []
+        mmd_values: list[float] = []
+        spectral_values: list[float] = []
+        entropy_values: list[float] = []
 
         actual_iters = min(iterations, len(baseline_frames) // 2)
         frames = list(baseline_frames)
@@ -91,9 +91,9 @@ class DynamicBaselineService:
             spectral_values.append(graph_result["spectral_distance"])
             entropy_values.append(swarm_result["transition_entropy_delta"])
 
-        thresholds: Dict[str, float] = {}
+        thresholds: dict[str, float] = {}
 
-        def _calibrate(metric: str, values: List[float]) -> None:
+        def _calibrate(metric: str, values: list[float]) -> None:
             mu = float(np.mean(values))
             sigma = float(np.std(values))
             thresholds[metric] = mu + k_sigma * sigma

@@ -24,7 +24,7 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -44,7 +44,7 @@ FRAME_FLUSH_DELAY_S = int(os.environ.get("FRAME_FLUSH_DELAY_S", "3"))
 
 # ── Test data ───────────────────────────────────────────────────────────
 
-GRAPH_PATH: Dict[str, Any] = {
+GRAPH_PATH: dict[str, Any] = {
     "nodes": [{"id": str(i)} for i in range(1, 5)],
     "edges": [
         {"source": "1", "target": "2"},
@@ -53,7 +53,7 @@ GRAPH_PATH: Dict[str, Any] = {
     ],
 }
 
-GRAPH_CYCLE: Dict[str, Any] = {
+GRAPH_CYCLE: dict[str, Any] = {
     "nodes": [{"id": str(i)} for i in range(1, 5)],
     "edges": [
         {"source": "1", "target": "2"},
@@ -66,7 +66,7 @@ GRAPH_CYCLE: Dict[str, Any] = {
 
 def make_frame(
     idx: int, embedding_dim: int = 8, seed: int | None = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a realistic ``RAGEvaluationFrame`` JSON payload."""
     rng = random.Random(seed if seed is not None else idx)
     embedding = [rng.gauss(0, 1) for _ in range(embedding_dim)]
@@ -90,14 +90,14 @@ def make_frame(
     }
 
 
-def make_frame_batch(n: int) -> List[Dict[str, Any]]:
+def make_frame_batch(n: int) -> list[dict[str, Any]]:
     return [make_frame(i, seed=42 + i) for i in range(n)]
 
 
 # ── Docker management ───────────────────────────────────────────────────
 
 
-def _compose(args: List[str]) -> subprocess.CompletedProcess:
+def _compose(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["docker", "compose"] + args,
         capture_output=True,
@@ -132,7 +132,7 @@ def start_docker_services() -> bool:
         return False
 
 
-def start_api_local() -> Optional[subprocess.Popen]:
+def start_api_local() -> subprocess.Popen | None:
     """Start the FastAPI API as a local uvicorn subprocess."""
     print("  Starting API locally via uvicorn...")
     env = os.environ.copy()
@@ -181,7 +181,7 @@ def compose_down() -> None:
             print(f"  stderr: {result.stderr[:200]}")
 
 
-def stop_api(proc: Optional[subprocess.Popen]) -> None:
+def stop_api(proc: subprocess.Popen | None) -> None:
     """Terminate the local API subprocess."""
     if proc is None:
         return
@@ -254,7 +254,7 @@ def poll_health() -> bool:
 # ── Telemetry flow ──────────────────────────────────────────────────────
 
 
-def ingest_frames(frames: List[Dict[str, Any]]) -> Dict[str, Any]:
+def ingest_frames(frames: list[dict[str, Any]]) -> dict[str, Any]:
     """POST a batch of frames and assert 202."""
     print("[3/5] Ingesting telemetry frames...")
     resp = httpx.post(
@@ -274,7 +274,7 @@ def wait_for_flush() -> None:
     time.sleep(FRAME_FLUSH_DELAY_S)
 
 
-def evaluate_drift() -> Dict[str, Any]:
+def evaluate_drift() -> dict[str, Any]:
     """POST an evaluate request without explicit baseline (dynamic fallback)."""
     print("[4/5] Evaluating drift with dynamic sliding baseline...")
     current = make_frame_batch(4)
@@ -341,8 +341,8 @@ def _is_api_reachable() -> bool:
 
 
 def main() -> None:
-    results: Dict[str, Any] = {"checks": [], "summary": {}}
-    api_proc: Optional[subprocess.Popen] = None
+    results: dict[str, Any] = {"checks": [], "summary": {}}
+    api_proc: subprocess.Popen | None = None
     api_already_running = False
 
     try:

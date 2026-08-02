@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
@@ -22,9 +21,9 @@ logger = get_logger("api.app")
 
 
 def create_app(
-    store: Optional[DriftStore] = None,
-    buffer: Optional[AsyncIngestionBuffer | RedisStreamBuffer] = None,
-    monitor: Optional[DriftMonitor] = None,
+    store: DriftStore | None = None,
+    buffer: AsyncIngestionBuffer | RedisStreamBuffer | None = None,
+    monitor: DriftMonitor | None = None,
 ) -> FastAPI:
     """Build the drift ingestion gateway.
 

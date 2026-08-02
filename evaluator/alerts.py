@@ -1,7 +1,7 @@
 import logging
 import time
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -13,7 +13,7 @@ logger = logging.getLogger("Alerts")
 class DriftAlert(BaseModel):
     severity: Literal["warning", "critical"]
     jsd_score: float
-    mmd_score: Optional[float] = None
+    mmd_score: float | None = None
     threshold: float
     timestamp: datetime
     message: str
@@ -34,7 +34,7 @@ class AlertManager:
         return False
 
     def _determine_severity(
-        self, jsd_score: float, threshold: float, mmd_p_value: Optional[float] = None
+        self, jsd_score: float, threshold: float, mmd_p_value: float | None = None
     ) -> str:
         if jsd_score > threshold * 1.5 or (
             mmd_p_value is not None and mmd_p_value < 0.01
@@ -46,8 +46,8 @@ class AlertManager:
         self,
         jsd_score: float,
         threshold: float,
-        mmd_score: Optional[float] = None,
-        mmd_p_value: Optional[float] = None,
+        mmd_score: float | None = None,
+        mmd_p_value: float | None = None,
         correlation_id: str = "",
     ) -> None:
         severity = self._determine_severity(jsd_score, threshold, mmd_p_value)

@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 import pytest
@@ -39,33 +39,33 @@ CYCLE_GRAPH = {
 class FakeRepo:
     """In-memory stand-in for the DriftStore persistence contract."""
 
-    def __init__(self, recent: Optional[List[RAGEvaluationFrame]] = None) -> None:
-        self.batches: List[List[RAGEvaluationFrame]] = []
-        self.recorded: List[RAGEvaluationFrame] = []
+    def __init__(self, recent: list[RAGEvaluationFrame] | None = None) -> None:
+        self.batches: list[list[RAGEvaluationFrame]] = []
+        self.recorded: list[RAGEvaluationFrame] = []
         self.recent = recent or []
         self.closed = False
         self.fail_batches = False
         self.flush_attempts = 0
 
-    async def batch_store_frames(self, frames: List[RAGEvaluationFrame]) -> None:
+    async def batch_store_frames(self, frames: list[RAGEvaluationFrame]) -> None:
         self.flush_attempts += 1
         if self.fail_batches:
             raise ConnectionError("simulated persistence outage")
         self.batches.append(list(frames))
 
     async def record_evaluation(
-        self, frame: RAGEvaluationFrame, metrics: Dict[str, Any]
+        self, frame: RAGEvaluationFrame, metrics: dict[str, Any]
     ) -> None:
         self.recorded.append(frame)
 
     async def get_recent_frames(
-        self, rag_type: Optional[str] = None, limit: int = 100
-    ) -> List[RAGEvaluationFrame]:
+        self, rag_type: str | None = None, limit: int = 100
+    ) -> list[RAGEvaluationFrame]:
         return self.recent
 
     async def get_frames_by_time_window(
         self, hours: int = 24, limit: int = 100
-    ) -> List[RAGEvaluationFrame]:
+    ) -> list[RAGEvaluationFrame]:
         return self.recent
 
     async def close(self) -> None:
@@ -74,10 +74,10 @@ class FakeRepo:
 
 def _frame(
     *,
-    embedding: Optional[List[float]] = None,
+    embedding: list[float] | None = None,
     rag_type: str = "naive",
-    graph: Optional[Dict[str, Any]] = None,
-    agent_hops: Optional[List[str]] = None,
+    graph: dict[str, Any] | None = None,
+    agent_hops: list[str] | None = None,
     reflection_iterations: int = 0,
 ) -> RAGEvaluationFrame:
     return RAGEvaluationFrame(
@@ -95,7 +95,7 @@ def _frame(
     )
 
 
-def _frame_json(frame: RAGEvaluationFrame) -> Dict[str, Any]:
+def _frame_json(frame: RAGEvaluationFrame) -> dict[str, Any]:
     return frame.model_dump(mode="json")
 
 

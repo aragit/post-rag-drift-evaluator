@@ -1,10 +1,11 @@
 import json
+
 import litellm
-from typing import List
+
 from evaluator.config import config
+from evaluator.logging_config import get_logger
 from evaluator.utils.mock_embedding import is_mock_key
 from evaluator.utils.retry import call_with_retry
-from evaluator.logging_config import get_logger
 
 logger = get_logger("MetricsJudge")
 
@@ -12,7 +13,7 @@ MOCK_SCORE = 0.85
 
 
 def evaluate_faithfulness(
-    query: str, contexts: List[str], answer: str, model: str = config.DEFAULT_MODEL
+    query: str, contexts: list[str], answer: str, model: str = config.DEFAULT_MODEL
 ) -> float:
     """Measures if the generated answer is strictly grounded in the provided context (0.0 to 1.0)."""
     context_str = "\n".join(contexts)
@@ -45,7 +46,7 @@ def evaluate_faithfulness(
 
 
 def evaluate_context_precision(
-    query: str, contexts: List[str], model: str = config.DEFAULT_MODEL
+    query: str, contexts: list[str], model: str = config.DEFAULT_MODEL
 ) -> float:
     """Measures the signal-to-noise ratio of the retrieved contexts (0.0 to 1.0)."""
     context_str = "\n".join(contexts)

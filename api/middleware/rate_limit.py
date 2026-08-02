@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import defaultdict
-from typing import Dict, List
 
 from fastapi import HTTPException, Request
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS
@@ -14,7 +13,7 @@ from evaluator.logging_config import get_logger
 logger = get_logger("RateLimiter")
 
 _WINDOW_SECONDS: float = 60.0
-_requests: Dict[str, List[float]] = defaultdict(list)
+_requests: dict[str, list[float]] = defaultdict(list)
 _lock = asyncio.Lock()
 
 
