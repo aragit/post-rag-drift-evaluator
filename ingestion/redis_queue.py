@@ -65,6 +65,7 @@ class RedisStreamBuffer:
 
     async def _ensure_client(self) -> redis.asyncio.Redis:
         if self._client is None:
+            assert self._redis_url is not None, "redis_url must be provided"
             self._client = redis.asyncio.from_url(self._redis_url)
         return self._client
 
@@ -123,7 +124,7 @@ class RedisStreamBuffer:
 
         while not self._stopped:
             try:
-                response = await client.xreadgroup(
+                response: Any = await client.xreadgroup(
                     groupname=self._consumer_group,
                     consumername=self._consumer_name,
                     streams={self._stream_key: ">"},

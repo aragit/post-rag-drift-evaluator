@@ -31,6 +31,7 @@ class EmbeddingCache:
 
     def _get_client(self) -> redis.Redis:
         if self._client is None:
+            assert self._redis_url is not None, "redis_url must be configured"
             self._client = redis.from_url(self._redis_url, decode_responses=True)
         return self._client
 
@@ -68,6 +69,7 @@ class ResultCache:
 
     def _get_client(self) -> redis.Redis:
         if self._client is None:
+            assert self._redis_url is not None, "redis_url must be configured"
             self._client = redis.from_url(self._redis_url, decode_responses=True)
         return self._client
 
