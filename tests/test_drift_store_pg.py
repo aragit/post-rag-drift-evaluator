@@ -97,6 +97,40 @@ async def test_record_evaluation_defaults_metrics():
 
 
 @pytest.mark.asyncio
+async def test_batch_store_frames_inserts_all_frames():
+    conn = AsyncMock()
+
+    with _patch_db(conn):
+        await DriftStore().batch_store_frames([_frame(), _frame(rag_type="swarm")])
+
+    conn.executemany.assert_awaited_once()
+    sql, rows = conn.executemany.call_args.args
+    assert "INSERT INTO telemetry_evaluations" in sql
+    assert len(rows) == 2
+    for row in rows:
+        _, trace_id, rag_type, timestamp, jsd, mmd, wasser, drifted, frame_json = row
+        assert isinstance(trace_id, str)
+        assert rag_type in {"naive", "swarm"}
+        assert isinstance(timestamp, datetime)
+        assert jsd is None
+        assert mmd is None
+        assert wasser is None
+        assert drifted is False
+        payload = json.loads(frame_json)
+        assert payload["query"]["text"] == "What is the capital?"
+
+
+@pytest.mark.asyncio
+async def test_batch_store_frames_skips_empty_batch():
+    conn = AsyncMock()
+
+    with _patch_db(conn):
+        await DriftStore().batch_store_frames([])
+
+    conn.executemany.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_get_recent_frames_deserializes_payloads():
     conn = AsyncMock()
     stored = _frame(rag_type="swarm")

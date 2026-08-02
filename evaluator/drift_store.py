@@ -101,6 +101,37 @@ class DriftStore:
             frame.metadata.rag_type,
         )
 
+    async def batch_store_frames(self, frames: List[RAGEvaluationFrame]) -> None:
+        """Persist multiple raw telemetry frames in a single round trip.
+
+        Used by the async ingestion buffer to batch-write ingested frames
+        without blocking the HTTP ingestion endpoint.
+        """
+        if not frames:
+            return
+        conn, owned = await self._connection()
+        try:
+            await conn.executemany(
+                INSERT_EVALUATION_SQL,
+                [
+                    (
+                        uuid.uuid4(),
+                        frame.trace_id,
+                        frame.metadata.rag_type,
+                        frame.timestamp,
+                        None,
+                        None,
+                        None,
+                        False,
+                        frame.model_dump_json(),
+                    )
+                    for frame in frames
+                ],
+            )
+        finally:
+            await self._release(conn, owned)
+        logger.info("Batch persisted %d evaluation frames.", len(frames))
+
     async def get_recent_frames(
         self, rag_type: Optional[str] = None, limit: int = 100
     ) -> List[RAGEvaluationFrame]:
