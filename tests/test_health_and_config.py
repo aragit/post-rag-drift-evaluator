@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -58,7 +58,13 @@ async def test_readyz_returns_503_when_buffer_not_running(postgres_available):
         pytest.skip("PostgreSQL is not available")
 
     store = FakeRepo()
-    app = create_app(store=store, buffer=None)
+    buffer_mock = MagicMock()
+    buffer_mock.is_running = False
+    buffer_mock.buffer_type = "mock"
+    buffer_mock.pending = 0
+    buffer_mock.start_worker = AsyncMock()
+    buffer_mock.stop_worker = AsyncMock()
+    app = create_app(store=store, buffer=buffer_mock)
 
     async with api_client(app) as client:
         response = await client.get("/readyz")
