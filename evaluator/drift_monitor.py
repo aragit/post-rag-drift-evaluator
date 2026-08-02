@@ -245,7 +245,7 @@ class DriftMonitor:
         k_cc = rbf_kernel(current_matrix, current_matrix, gamma)
         k_bc = rbf_kernel(baseline_matrix, current_matrix, gamma)
 
-        mmd_sq = np.mean(k_bb) + np.mean(k_cc) - 2 * np.mean(k_bc)
+        mmd_sq = float(np.mean(k_bb) + np.mean(k_cc) - 2 * np.mean(k_bc))
         mmd_sq = max(0.0, mmd_sq)
         mmd_score = float(np.sqrt(mmd_sq))
 
@@ -262,7 +262,7 @@ class DriftMonitor:
             perm_cc = rbf_kernel(perm_c, perm_c, gamma)
             perm_bc = rbf_kernel(perm_b, perm_c, gamma)
 
-            perm_mmd = np.mean(perm_bb) + np.mean(perm_cc) - 2 * np.mean(perm_bc)
+            perm_mmd = float(np.mean(perm_bb) + np.mean(perm_cc) - 2 * np.mean(perm_bc))
             perm_scores.append(max(0.0, perm_mmd))
 
         perm_scores_arr = np.array(perm_scores)
