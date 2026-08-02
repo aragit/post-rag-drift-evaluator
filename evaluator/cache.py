@@ -21,7 +21,9 @@ def _make_key(*parts: str) -> str:
 
 class EmbeddingCache:
     def __init__(
-        self, redis_url: str = config.REDIS_URL, ttl: int = config.EMBEDDING_CACHE_TTL
+        self,
+        redis_url: str | None = config.REDIS_URL,
+        ttl: int = config.EMBEDDING_CACHE_TTL,
     ):
         self._redis_url = redis_url
         self._ttl = ttl
@@ -40,7 +42,7 @@ class EmbeddingCache:
                 record_cache_miss("embedding")
                 return None
             record_cache_hit("embedding")
-            return json.loads(raw)
+            return json.loads(str(raw))
         except Exception as e:
             logger.warning(f"EmbeddingCache get failed: {e}")
             record_cache_miss("embedding")
@@ -56,7 +58,9 @@ class EmbeddingCache:
 
 class ResultCache:
     def __init__(
-        self, redis_url: str = config.REDIS_URL, ttl: int = config.RESULT_CACHE_TTL
+        self,
+        redis_url: str | None = config.REDIS_URL,
+        ttl: int = config.RESULT_CACHE_TTL,
     ):
         self._redis_url = redis_url
         self._ttl = ttl
@@ -75,7 +79,7 @@ class ResultCache:
                 record_cache_miss("result")
                 return None
             record_cache_hit("result")
-            data = json.loads(raw)
+            data = json.loads(str(raw))
             from evaluator.rag_pipelines.base import RAGResponse
 
             return RAGResponse.model_validate(data)

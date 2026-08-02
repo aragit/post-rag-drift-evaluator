@@ -35,7 +35,7 @@ class AlertManager:
 
     def _determine_severity(
         self, jsd_score: float, threshold: float, mmd_p_value: float | None = None
-    ) -> str:
+    ) -> Literal["warning", "critical"]:
         if jsd_score > threshold * 1.5 or (
             mmd_p_value is not None and mmd_p_value < 0.01
         ):
@@ -103,3 +103,6 @@ class AlertManager:
             logger.info(f"Alert sent via PagerDuty: severity={alert.severity}")
         except Exception as e:
             logger.error(f"PagerDuty alert failed: {e}")
+
+    def _flush(self) -> None:
+        self._last_alert_time.clear()

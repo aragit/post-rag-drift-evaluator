@@ -9,7 +9,7 @@ correlation_id = str(uuid.uuid4())
 
 def setup_logging(
     level: int = logging.INFO,
-    log_format: str = None,
+    log_format: str | None = None,
 ) -> logging.Logger:
     if log_format is None:
         log_format = (

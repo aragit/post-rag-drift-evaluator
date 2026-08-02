@@ -7,6 +7,7 @@ from scipy.stats import gaussian_kde
 from sklearn.decomposition import PCA
 
 from alerting.notifier import DriftAlertNotifier
+from evaluator.baseline_service import DynamicBaselineService
 from evaluator.config import config
 from evaluator.drift.graph_drift import GraphDriftCalculator
 from evaluator.drift.swarm_drift import SwarmDriftCalculator
@@ -23,7 +24,7 @@ class DriftMonitor:
         threshold: float = config.DRIFT_THRESHOLD,
         store: DriftStore | None = None,
         notifier: DriftAlertNotifier | None = None,
-        baseline_service: object | None = None,
+        baseline_service: "DynamicBaselineService | None" = None,
     ):
         self.threshold = threshold
         self.mmd_threshold = config.MMD_THRESHOLD
@@ -43,7 +44,7 @@ class DriftMonitor:
         baseline_embeddings = np.atleast_2d(baseline_embeddings)
         n_samples = baseline_embeddings.shape[0]
 
-        js_scores = []
+        js_scores: list[float] = []
         for _ in range(n_bootstrap):
             idx = np.random.choice(n_samples, size=n_samples, replace=True)
             bootstrap_sample = baseline_embeddings[idx]
@@ -53,12 +54,12 @@ class DriftMonitor:
             js_score = float(jensenshannon(p, q))
             js_scores.append(js_score)
 
-        js_scores = np.array(js_scores)
-        js_mean = float(np.mean(js_scores))
-        js_std = float(np.std(js_scores))
+        js_scores_arr = np.array(js_scores)
+        js_mean = float(np.mean(js_scores_arr))
+        js_std = float(np.std(js_scores_arr))
         calibrated_js_threshold = js_mean + 3 * js_std
 
-        mmd_scores = []
+        mmd_scores: list[float] = []
         for _ in range(min(n_bootstrap, 100)):
             idx = np.random.choice(n_samples, size=n_samples, replace=True)
             bootstrap_sample = baseline_embeddings[idx]
@@ -92,12 +93,12 @@ class DriftMonitor:
             mmd_sq = max(0.0, np.mean(k_bb) + np.mean(k_bs) - 2 * np.mean(k_bb_cross))
             mmd_scores.append(np.sqrt(mmd_sq))
 
-        mmd_scores = np.array(mmd_scores)
-        mmd_mean = float(np.mean(mmd_scores))
-        mmd_std = float(np.std(mmd_scores))
+        mmd_scores_arr = np.array(mmd_scores)
+        mmd_mean = float(np.mean(mmd_scores_arr))
+        mmd_std = float(np.std(mmd_scores_arr))
         calibrated_mmd_threshold = mmd_mean + 3 * mmd_std
 
-        kl_scores = []
+        kl_scores: list[float] = []
         n_components = min(10, baseline_embeddings.shape[1])
         pca = PCA(n_components=n_components)
         pca.fit(baseline_embeddings)
@@ -115,9 +116,9 @@ class DriftMonitor:
             except Exception:
                 kl_scores.append(0.0)
 
-        kl_scores = np.array(kl_scores)
-        kl_mean = float(np.mean(kl_scores))
-        kl_std = float(np.std(kl_scores))
+        kl_scores_arr = np.array(kl_scores)
+        kl_mean = float(np.mean(kl_scores_arr))
+        kl_std = float(np.std(kl_scores_arr))
         calibrated_kl_threshold = kl_mean + 3 * kl_std
 
         self.calibrated_thresholds = {
@@ -249,7 +250,7 @@ class DriftMonitor:
         mmd_score = float(np.sqrt(mmd_sq))
 
         n_permutations = 100
-        perm_scores = []
+        perm_scores: list[float] = []
         combined = np.vstack([baseline_matrix, current_matrix])
         n_total = combined.shape[0]
         for _ in range(n_permutations):
@@ -264,8 +265,8 @@ class DriftMonitor:
             perm_mmd = np.mean(perm_bb) + np.mean(perm_cc) - 2 * np.mean(perm_bc)
             perm_scores.append(max(0.0, perm_mmd))
 
-        perm_scores = np.array(perm_scores)
-        p_value = float(np.mean(perm_scores >= mmd_sq))
+        perm_scores_arr = np.array(perm_scores)
+        p_value = float(np.mean(perm_scores_arr >= mmd_sq))
 
         mmd_threshold = self._get_threshold("mmd_score")
         is_drifted = p_value < 0.05 or mmd_score > mmd_threshold

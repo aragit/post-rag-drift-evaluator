@@ -58,7 +58,7 @@ class DriftStore:
         return conn, False
 
     async def _release(self, conn: Any, owned: bool) -> None:
-        if owned:
+        if owned and self._pool is not None:
             await self._pool.release(conn)
         else:
             await db_pool.release(conn)

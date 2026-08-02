@@ -199,7 +199,7 @@ class AgenticRAG(BaseRAGPipeline):
             query=query,
             retrieved_contexts=all_contexts,
             generated_answer=answer,
-            query_embedding=primary_vector,
+            query_embedding=primary_vector or [],
             reflection_iterations=reflection_iterations,
             final_confidence=final_confidence,
             metadata={"sub_queries_generated": sub_queries, "token_usage": {}},

@@ -84,7 +84,11 @@ class RAGEvaluationFrame(BaseModel):
 
     @classmethod
     def from_legacy_rag_response(
-        cls, rag_response: RAGResponse, rag_type: str = "agentic"
+        cls,
+        rag_response: RAGResponse,
+        rag_type: Literal[
+            "naive", "agentic", "graph_rag", "swarm", "custom"
+        ] = "agentic",
     ) -> RAGEvaluationFrame:
         """Adapt a legacy ``RAGResponse`` into the unified telemetry frame.
 
