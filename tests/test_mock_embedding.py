@@ -1,5 +1,9 @@
 import numpy as np
-from evaluator.utils.mock_embedding import is_mock_key, generate_mock_embedding, generate_random_embedding
+from evaluator.utils.mock_embedding import (
+    is_mock_key,
+    generate_mock_embedding,
+    generate_random_embedding,
+)
 
 
 def test_is_mock_key_with_none():

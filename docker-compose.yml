@@ -33,6 +33,15 @@ services:
       - EMBEDDING_MODEL=text-embedding-3-small
     volumes:
       - .:/app
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   pgdata:

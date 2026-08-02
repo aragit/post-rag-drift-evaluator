@@ -31,7 +31,7 @@ def is_mock_key(key: str | None) -> bool:
 
 def generate_mock_embedding(text: str, dim: int = 1536) -> List[float]:
     """Generate a deterministic mock embedding based on text hash.
-    
+
     Uses MD5 hash of input text as seed for reproducible embeddings.
     Returns normalized random vector that is deterministic for same input.
     """
@@ -43,7 +43,9 @@ def generate_mock_embedding(text: str, dim: int = 1536) -> List[float]:
     return vec.tolist()
 
 
-def generate_mock_completion(prompt: str, response_format: str | None = None) -> MockCompletionResponse:
+def generate_mock_completion(
+    prompt: str, response_format: str | dict | None = None
+) -> MockCompletionResponse:
     """Generate a deterministic mock completion response.
 
     Returns a structure matching litellm.completion() output, bypassing
@@ -53,6 +55,14 @@ def generate_mock_completion(prompt: str, response_format: str | None = None) ->
         content = (
             '["What are the eligibility criteria for protocol Alpha?",'
             '"What are the budget constraints for Q3 operations?"]'
+        )
+    elif (
+        isinstance(response_format, dict)
+        and response_format.get("type") == "json_object"
+    ):
+        content = (
+            '{"answer_sufficient": true, "claims_supported": true, '
+            '"missing_context": [], "confidence_score": 0.95}'
         )
     else:
         content = (

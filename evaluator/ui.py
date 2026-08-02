@@ -1,62 +1,101 @@
-import os
-import sys
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+import asyncio
+from typing import Optional, Tuple
 
-import streamlit as st
+import asyncpg
 import polars as pl
-import numpy as np
-from sklearn.decomposition import PCA
+import streamlit as st
+
 from evaluator.config import config
-from evaluator.drift_monitor import DriftMonitor
+from evaluator.drift_store import DriftStore
 
 st.set_page_config(page_title="Post-RAG Drift Evaluator", page_icon="📊", layout="wide")
 st.title("📊 Enterprise Post-RAG Latent Space Drift Telemetry")
 
 st.sidebar.header("Configuration Profile")
-threshold = st.sidebar.slider("JS Divergence Threshold Alert Limit", 0.05, 0.50, 0.15, 0.01)
-
-monitor = DriftMonitor(threshold=threshold)
-
-np.random.seed(42)
-base_arr = np.random.normal(0, 1, (100, 128))
-rng_drift = np.random.RandomState(99)
-curr_arr = base_arr + rng_drift.normal(0, 0.10, (100, 128))
-
-df_base = pl.DataFrame({"embedding": base_arr.tolist()})
-df_curr = pl.DataFrame({"embedding": curr_arr.tolist()})
-
-js_score, is_drifted = monitor.compute_jensen_shannon_drift(df_base, df_curr)
-
-col1, col2 = st.columns(2)
-with col1:
-    st.metric(label="Jensen-Shannon Divergence Score", value=f"{js_score:.4f}")
-with col2:
-    if is_drifted:
-        st.error("🚨 CRITICAL STATE: SYSTEM EMBEDDING DRIFT DETECTED")
-    else:
-        st.success("🟢 STATUS NORMAL: RETRIEVAL MATRIX EMBEDDING STABLE")
-
-st.subheader("2D PCA Coordinate Projection: Baseline Traffic vs Current Traffic Space")
-
-pca = PCA(n_components=2)
-all_data = np.vstack([base_arr, curr_arr])
-pca.fit(all_data)
-
-base_2d = pca.transform(base_arr)
-curr_2d = pca.transform(curr_arr)
-
-chart_data = pl.DataFrame({
-    "PCA Axis 1": np.concatenate([base_2d[:, 0], curr_2d[:, 0]]),
-    "PCA Axis 2": np.concatenate([base_2d[:, 1], curr_2d[:, 1]]),
-    "Dataset Group": ["Baseline Core Data"] * 100 + ["Live Current Ingestion"] * 100
-})
-
-st.scatter_chart(
-    chart_data.to_pandas(),
-    x="PCA Axis 1",
-    y="PCA Axis 2",
-    color="Dataset Group",
-    use_container_width=True
+threshold = st.sidebar.slider(
+    "JS Divergence Threshold Alert Limit", 0.05, 0.50, 0.15, 0.01
 )
+
+if st.sidebar.button("Refresh", key="refresh_button"):
+    st.rerun()
+
+
+def _load_dashboard() -> Tuple[Optional[dict], Optional[pl.DataFrame], bool, list]:
+    """Run async store reads on a loop-local pool (safe for Streamlit reruns)."""
+
+    async def _load() -> Tuple[Optional[dict], Optional[pl.DataFrame], bool, list]:
+        pool = await asyncpg.create_pool(
+            dsn=config.DATABASE_URL, min_size=1, max_size=2
+        )
+        try:
+            store = DriftStore(pool=pool)
+            latest = await store.get_latest_drift()
+            trend = await store.get_trend(window=30)
+            anomaly = await store.detect_anomaly(window=30)
+            frames = await store.get_recent_frames(limit=10)
+            return latest, trend, anomaly, frames
+        finally:
+            await pool.close()
+
+    try:
+        return asyncio.run(_load())
+    except Exception:
+        return None, None, False, []
+
+
+latest, trend, anomaly, frames = _load_dashboard()
+
+if latest is not None:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(
+            label="Jensen-Shannon Divergence Score",
+            value=f"{latest['jsd_score']:.4f}",
+        )
+    with col2:
+        if latest["is_drifted"]:
+            st.error("🚨 CRITICAL STATE: SYSTEM EMBEDDING DRIFT DETECTED")
+        else:
+            st.success("🟢 STATUS NORMAL: RETRIEVAL MATRIX EMBEDDING STABLE")
+
+    st.subheader("Drift History Trend")
+    if trend is not None and trend.height > 0:
+        trend_df = trend.to_pandas().set_index("timestamp")
+        chart_cols = [c for c in ("jsd_score", "rolling_mean") if c in trend_df.columns]
+        chart_df = trend_df[chart_cols].copy()
+        if "rolling_std" in trend_df.columns:
+            chart_df["upper_band"] = (
+                trend_df["rolling_mean"] + 2 * trend_df["rolling_std"]
+            )
+            chart_df["lower_band"] = (
+                trend_df["rolling_mean"] - 2 * trend_df["rolling_std"]
+            )
+        st.line_chart(chart_df)
+    else:
+        st.info(
+            "No drift history recorded yet. Run a comprehensive drift check to populate history."
+        )
+
+    st.subheader("Anomaly Detection")
+    if anomaly:
+        st.warning("⚠️ Anomaly detected in recent drift history.")
+    else:
+        st.info("No anomalies detected in recent history.")
+
+    if frames:
+        st.subheader("Recent Telemetry Frames")
+        st.dataframe(
+            pl.DataFrame(
+                {
+                    "trace_id": [f.trace_id for f in frames],
+                    "rag_type": [f.metadata.rag_type for f in frames],
+                    "timestamp": [f.timestamp.isoformat() for f in frames],
+                    "query": [f.query.text for f in frames],
+                    "confidence": [f.output.confidence_score for f in frames],
+                }
+            ).to_pandas()
+        )
+else:
+    st.info(
+        "No drift data available. Run a comprehensive drift check to populate the store."
+    )

@@ -156,10 +156,19 @@ docker compose up -d --build
 
 ### 4. Seed the Vector Space
 
-Initialize your database schemas and populate your local vector columns:
+Apply database migrations and populate your local vector columns:
 
 ```bash
+alembic upgrade head
 python scripts/seed_db.py
+```
+
+For a clean development reset, use the `--force-reset` flag:
+
+```bash
+alembic downgrade base
+alembic upgrade head
+python scripts/seed_db.py --force-reset
 ```
 
 ### 5. Execute the Evaluation Suite
@@ -269,9 +278,10 @@ The framework uses a configuration-driven architecture. **No code changes are re
    ```
 
 2. **Re-Seed Your Index (Optional):** If you want to use genuine semantic distributions rather than mock vectors, ensure your database seeder hooks into your live embedding model (`text-embedding-3-small`):
-   ```bash
-   python scripts/seed_db.py
-   ```
+    ```bash
+    alembic upgrade head
+    python scripts/seed_db.py
+    ```
 
 3. **Execute:** Run `python -m evaluator.benchmark`. The pipeline will automatically bypass the offline mock interceptors, dispatch real asynchronous API calls via litellm, calculate authentic latency/token matrices, and evaluate responses using the live LLM-as-a-Judge.
 
@@ -330,6 +340,19 @@ We welcome contributions to expand the benchmarking framework (such as adding gr
 
 ---
 
+## Citation
+
+If you use this framework in your research or production evaluations, please cite it as follows:
+
+```bibtex
+@software{post_rag_drift_evaluator,
+  title = {Post-RAG Drift Evaluator},
+  author = {Arash Nicoomanesh (aragit)},
+  year = {2026},
+  url = {https://github.com/aragit/post-rag-drift-evaluator}
+}
+```
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. You are free to modify, distribute, and utilize this software in commercial or private environments without restriction.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

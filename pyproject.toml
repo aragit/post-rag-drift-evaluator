@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "post-rag-drift-evaluator"
+version = "0.1.0"
+description = "Framework-agnostic benchmark comparing Naive RAG vs. Agentic RAG on embedding drift, faithfulness, and context precision."
+requires-python = ">=3.10"
+dependencies = [
+    "polars>=1.0.0",
+    "scikit-learn>=1.5.0",
+    "numpy>=1.26.0",
+    "scipy>=1.12.0",
+    "litellm>=1.35.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.1",
+    "psycopg2-binary>=2.9.9",
+    "asyncpg>=0.29.0",
+    "prometheus-client>=0.20.0",
+    "alembic>=1.13.0",
+    "tenacity>=8.2.0",
+    "python-dotenv>=1.0.1",
+    "streamlit>=1.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.1.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "pytest-asyncio>=0.23.0",
+    "hypothesis>=6.100.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["evaluator*", "scripts*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

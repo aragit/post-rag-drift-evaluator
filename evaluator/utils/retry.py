@@ -1,0 +1,39 @@
+import logging
+from typing import Any, Callable, TypeVar
+
+import litellm
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_exponential,
+    retry_if_exception_type,
+)
+
+logger = logging.getLogger("Retry")
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+_RETRYABLE_EXCEPTIONS = (
+    litellm.exceptions.RateLimitError,
+    litellm.exceptions.ServiceUnavailableError,
+    litellm.exceptions.Timeout,
+)
+
+
+def _retry_litellm(func: F) -> F:
+    @retry(
+        retry=retry_if_exception_type(_RETRYABLE_EXCEPTIONS),
+        stop=(stop_after_attempt(3) | stop_after_delay(30)),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        return func(*args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
+
+
+def call_with_retry(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """Call a litellm function with retry logic for transient API errors."""
+    return _retry_litellm(func)(*args, **kwargs)

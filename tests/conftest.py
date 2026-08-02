@@ -1,0 +1,31 @@
+import asyncio
+
+import asyncpg
+import pytest
+import redis
+
+from evaluator.config import config
+
+
+@pytest.fixture(autouse=True)
+def flush_redis():
+    try:
+        r = redis.from_url("redis://localhost:6379/0")
+        r.flushdb()
+    except Exception:
+        pass
+
+
+@pytest.fixture(scope="session")
+def postgres_available() -> bool:
+    """Whether a reachable PostgreSQL instance matches the configured URL."""
+
+    async def _probe() -> bool:
+        conn = await asyncpg.connect(config.DATABASE_URL, timeout=3)
+        await conn.close()
+        return True
+
+    try:
+        return asyncio.run(_probe())
+    except Exception:
+        return False

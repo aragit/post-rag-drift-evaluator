@@ -9,4 +9,6 @@ venv/
 .mypy_cache/
 .ruff_cache/
 *.log
+.drift_history.db
 .DS_Store
+SOURCE_CODE_REFERENCE.md
