@@ -23,6 +23,7 @@ ALERT_TIMEOUT_SECONDS = 5.0
 def _drift_alerts_total():
     """Lazy resolver for the Prometheus counter to avoid circular imports."""
     from api.metrics import DRIFT_ALERTS_TOTAL
+
     return DRIFT_ALERTS_TOTAL
 
 

@@ -528,9 +528,13 @@ class DriftMonitor:
         self.mmd_threshold = self._saved_thresholds["mmd"]
         self.per_component_kl_threshold = self._saved_thresholds["kl"]
         self._graph_calculator.spectral_threshold = self._saved_thresholds["spectral"]
-        self._graph_calculator.density_threshold = self._saved_thresholds["graph_density"]
+        self._graph_calculator.density_threshold = self._saved_thresholds[
+            "graph_density"
+        ]
         self._swarm_calculator.entropy_threshold = self._saved_thresholds["entropy"]
-        self._swarm_calculator.reflection_threshold = self._saved_thresholds["reflection"]
+        self._swarm_calculator.reflection_threshold = self._saved_thresholds[
+            "reflection"
+        ]
         self._calibrated = self._saved_thresholds["calibrated"]
         self.calibrated_thresholds = self._saved_thresholds["calibrated_thresholds"]
         self._saved_thresholds = None
@@ -558,7 +562,9 @@ class DriftMonitor:
         baseline_source: str = "explicit"
 
         if not baseline_frames and self._baseline_service is not None:
-            baseline_frames = await self._baseline_service.fetch_sliding_baseline_frames()
+            baseline_frames = (
+                await self._baseline_service.fetch_sliding_baseline_frames()
+            )
             baseline_source = "dynamic"
             logger.info(
                 "Fetched %d dynamic baseline frames for evaluation.",
@@ -570,9 +576,7 @@ class DriftMonitor:
             )
             if thresholds:
                 self._apply_calibrated_thresholds(thresholds)
-                logger.info(
-                    "Applied dynamically calibrated thresholds: %s", thresholds
-                )
+                logger.info("Applied dynamically calibrated thresholds: %s", thresholds)
             else:
                 logger.info(
                     "Falling back to static thresholds (insufficient baseline frames)."

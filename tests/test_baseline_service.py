@@ -50,6 +50,7 @@ def current_frames():
 # fetch_sliding_baseline_frames
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_fetch_returns_frames_from_store():
     store = AsyncMock()
@@ -79,6 +80,7 @@ async def test_fetch_uses_default_window_and_limit():
 # ---------------------------------------------------------------------------
 # compute_calibrated_thresholds
 # ---------------------------------------------------------------------------
+
 
 def test_compute_returns_empty_for_insufficient_frames():
     svc = DynamicBaselineService(store=AsyncMock())
@@ -113,8 +115,11 @@ def test_compute_uses_config_min_baseline_frames(baseline_frames):
 # DriftMonitor.evaluate_frames with dynamic baseline
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-async def test_evaluate_fetches_dynamic_baseline_when_none_provided(baseline_frames, current_frames):
+async def test_evaluate_fetches_dynamic_baseline_when_none_provided(
+    baseline_frames, current_frames
+):
     store = AsyncMock()
     store.get_frames_by_time_window = AsyncMock(return_value=baseline_frames)
     svc = DynamicBaselineService(store=store)
@@ -194,6 +199,7 @@ async def test_evaluate_no_baseline_service_still_works():
 # ---------------------------------------------------------------------------
 # Threshold save/restore
 # ---------------------------------------------------------------------------
+
 
 def test_apply_and_restore_thresholds():
     monitor = DriftMonitor(store=AsyncMock())

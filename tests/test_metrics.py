@@ -36,7 +36,9 @@ async def _client_with_repo(repo):
     app = create_app(store=repo, buffer=buffer)
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
             yield client
 
 
@@ -63,13 +65,14 @@ async def test_metrics_endpoint_returns_200_with_prometheus_format():
 async def test_frame_ingestion_metric_increments():
     repo = FakeRepo()
     async with _client_with_repo(repo) as client:
-        before = _sample_value(
-            "frame_ingestion_total", {"status": "accepted", "buffer_type": "memory"}
-        ) or 0.0
-
-        response = await client.post(
-            "/v1/telemetry/frames", json=_frame_json(_frame())
+        before = (
+            _sample_value(
+                "frame_ingestion_total", {"status": "accepted", "buffer_type": "memory"}
+            )
+            or 0.0
         )
+
+        response = await client.post("/v1/telemetry/frames", json=_frame_json(_frame()))
         assert response.status_code == 202
 
         after = _sample_value(
@@ -106,7 +109,9 @@ async def test_drift_score_gauges_updated():
     async with _client_with_repo(repo) as client:
         baseline = [
             _frame(embedding=[0.1, 0.2], graph=PATH_GRAPH, agent_hops=["a", "b", "a"]),
-            _frame(embedding=[0.11, 0.21], graph=PATH_GRAPH, agent_hops=["a", "b", "a"]),
+            _frame(
+                embedding=[0.11, 0.21], graph=PATH_GRAPH, agent_hops=["a", "b", "a"]
+            ),
         ]
         current = [
             _frame(
@@ -133,9 +138,7 @@ async def test_drift_score_gauges_updated():
         jsd = _sample_value("drift_score_gauge", {"metric_type": "vector_jsd"})
         mmd = _sample_value("drift_score_gauge", {"metric_type": "vector_mmd"})
         spectral = _sample_value("drift_score_gauge", {"metric_type": "graph_spectral"})
-        entropy = _sample_value(
-            "drift_score_gauge", {"metric_type": "swarm_entropy"}
-        )
+        entropy = _sample_value("drift_score_gauge", {"metric_type": "swarm_entropy"})
 
         assert jsd is not None
         assert mmd is not None
@@ -157,6 +160,7 @@ async def test_db_batch_write_latency_observed_after_ingestion():
             if repo.flush_attempts >= 1:
                 break
             import asyncio as _asyncio
+
             await _asyncio.sleep(0.05)
 
         after = _sample_value("db_batch_write_latency_seconds_count")

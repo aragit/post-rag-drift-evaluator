@@ -106,7 +106,9 @@ class AsyncIngestionBuffer:
             logger.error("Failed to persist %d frames: %s", len(frames), exc)
         else:
             DB_BATCH_WRITE_LATENCY_SECONDS.observe(time.monotonic() - start)
-            INGESTION_BUFFER_DEPTH.labels(buffer_type=self.buffer_type).set(self.pending)
+            INGESTION_BUFFER_DEPTH.labels(buffer_type=self.buffer_type).set(
+                self.pending
+            )
             logger.info("Flushed %d frames to persistence.", len(frames))
 
     async def stop_worker(self) -> None:

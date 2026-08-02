@@ -75,9 +75,7 @@ class EvaluatorConfig(BaseSettings):
             db = data.get("POSTGRES_DB", "rag_db")
             host = data.get("POSTGRES_HOST", "localhost")
             port = data.get("POSTGRES_PORT", 5432)
-            data["DATABASE_URL"] = (
-                f"postgresql://{user}:{pw}@{host}:{port}/{db}"
-            )
+            data["DATABASE_URL"] = f"postgresql://{user}:{pw}@{host}:{port}/{db}"
         return data
 
     @field_validator("API_KEYS", "CORS_ORIGINS", mode="before")

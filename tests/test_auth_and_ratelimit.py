@@ -16,9 +16,7 @@ async def test_requests_pass_without_api_key_when_auth_disabled():
     app = create_app(store=repo)
 
     async with api_client(app) as client:
-        response = await client.post(
-            "/v1/telemetry/frames", json=_frame_json(_frame())
-        )
+        response = await client.post("/v1/telemetry/frames", json=_frame_json(_frame()))
 
     assert response.status_code == 202
 
@@ -114,15 +112,9 @@ async def test_rate_limit_returns_429_when_exceeded():
 
     try:
         async with api_client(app) as client:
-            r1 = await client.post(
-                "/v1/telemetry/frames", json=_frame_json(_frame())
-            )
-            r2 = await client.post(
-                "/v1/telemetry/frames", json=_frame_json(_frame())
-            )
-            r3 = await client.post(
-                "/v1/telemetry/frames", json=_frame_json(_frame())
-            )
+            r1 = await client.post("/v1/telemetry/frames", json=_frame_json(_frame()))
+            r2 = await client.post("/v1/telemetry/frames", json=_frame_json(_frame()))
+            r3 = await client.post("/v1/telemetry/frames", json=_frame_json(_frame()))
 
         assert r1.status_code == 202
         assert r2.status_code == 202

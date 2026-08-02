@@ -43,7 +43,9 @@ async def test_readyz_returns_ready_when_db_connected(postgres_available):
 
 async def test_readyz_returns_503_when_db_disconnected():
     async with _app_with_store() as (client, _):
-        with patch.object(db_pool, "get_pool", side_effect=RuntimeError("simulated outage")):
+        with patch.object(
+            db_pool, "get_pool", side_effect=RuntimeError("simulated outage")
+        ):
             response = await client.get("/readyz")
 
     assert response.status_code == 503
@@ -91,7 +93,9 @@ def test_config_database_url_derived_from_pg_params(monkeypatch):
 
 
 def test_config_explicit_database_url_takes_precedence(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://override:secret@overridehost:9999/db")
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql://override:secret@overridehost:9999/db"
+    )
     monkeypatch.delenv("POSTGRES_USER", raising=False)
 
     from evaluator.config import EvaluatorConfig

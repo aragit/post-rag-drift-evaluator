@@ -148,7 +148,9 @@ class RedisStreamBuffer:
                 for msg_id, fields in messages:
                     raw = fields.get("frame") or fields.get(b"frame")
                     if raw is None:
-                        logger.warning("Stream message %s has no 'frame' field.", msg_id)
+                        logger.warning(
+                            "Stream message %s has no 'frame' field.", msg_id
+                        )
                         await client.xack(
                             self._stream_key, self._consumer_group, msg_id
                         )
@@ -195,10 +197,10 @@ class RedisStreamBuffer:
             DB_BATCH_WRITE_LATENCY_SECONDS.observe(time.monotonic() - start)
             await client.xack(self._stream_key, self._consumer_group, *msg_ids)
             self._pending = max(0, self._pending - len(frames))
-            INGESTION_BUFFER_DEPTH.labels(buffer_type=self.buffer_type).set(self.pending)
-            logger.info(
-                "Flushed and acknowledged %d frames from stream.", len(frames)
+            INGESTION_BUFFER_DEPTH.labels(buffer_type=self.buffer_type).set(
+                self.pending
             )
+            logger.info("Flushed and acknowledged %d frames from stream.", len(frames))
 
     async def stop_worker(self) -> None:
         """Signal the worker to stop, draining remaining messages first."""

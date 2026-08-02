@@ -64,7 +64,9 @@ GRAPH_CYCLE: Dict[str, Any] = {
 }
 
 
-def make_frame(idx: int, embedding_dim: int = 8, seed: int | None = None) -> Dict[str, Any]:
+def make_frame(
+    idx: int, embedding_dim: int = 8, seed: int | None = None
+) -> Dict[str, Any]:
     """Build a realistic ``RAGEvaluationFrame`` JSON payload."""
     rng = random.Random(seed if seed is not None else idx)
     embedding = [rng.gauss(0, 1) for _ in range(embedding_dim)]
@@ -93,6 +95,7 @@ def make_frame_batch(n: int) -> List[Dict[str, Any]]:
 
 
 # ── Docker management ───────────────────────────────────────────────────
+
 
 def _compose(args: List[str]) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -140,7 +143,16 @@ def start_api_local() -> Optional[subprocess.Popen]:
     env["API_KEY_REQUIRED"] = "False"
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "api.app:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+        ],
         cwd=_PROJECT_DIR,
         env=env,
         stdout=subprocess.DEVNULL,
@@ -179,6 +191,7 @@ def stop_api(proc: Optional[subprocess.Popen]) -> None:
 
 
 # ── Health & readiness polling ──────────────────────────────────────────
+
 
 def poll_health() -> bool:
     """Poll /healthz then /readyz until both return 200 (exponential backoff)."""
@@ -233,13 +246,18 @@ def poll_health() -> bool:
 
 # ── Telemetry flow ──────────────────────────────────────────────────────
 
+
 def ingest_frames(frames: List[Dict[str, Any]]) -> Dict[str, Any]:
     """POST a batch of frames and assert 202."""
     print("[3/5] Ingesting telemetry frames...")
-    resp = httpx.post(f"{BASE_URL}/v1/telemetry/frames", json={"frames": frames}, timeout=10)
+    resp = httpx.post(
+        f"{BASE_URL}/v1/telemetry/frames", json={"frames": frames}, timeout=10
+    )
     assert resp.status_code == 202, f"Expected 202, got {resp.status_code}: {resp.text}"
     body = resp.json()
-    print(f"  POST /v1/telemetry/frames → {resp.status_code}  accepted={body.get('count')}")
+    print(
+        f"  POST /v1/telemetry/frames → {resp.status_code}  accepted={body.get('count')}"
+    )
     return body
 
 
@@ -264,8 +282,12 @@ def evaluate_drift() -> Dict[str, Any]:
     print(f"    is_drifted        = {result.get('is_drifted')}")
     print(f"    vector_jsd        = {result['vector_drift'].get('js_divergence'):.6f}")
     print(f"    vector_mmd        = {result['vector_drift'].get('mmd_score'):.6f}")
-    print(f"    graph_spectral    = {result['graph_drift'].get('spectral_distance'):.6f}")
-    print(f"    swarm_entropy     = {result['swarm_drift'].get('transition_entropy_delta'):.6f}")
+    print(
+        f"    graph_spectral    = {result['graph_drift'].get('spectral_distance'):.6f}"
+    )
+    print(
+        f"    swarm_entropy     = {result['swarm_drift'].get('transition_entropy_delta'):.6f}"
+    )
     return result
 
 
@@ -282,16 +304,23 @@ def check_metrics() -> None:
         ("db_batch_write_latency_seconds", "DB_BATCH_WRITE_LATENCY_SECONDS"),
     ]
     for metric_name, label in required:
-        assert metric_name in text, f"Metric '{metric_name}' ({label}) not found in /metrics output"
+        assert metric_name in text, (
+            f"Metric '{metric_name}' ({label}) not found in /metrics output"
+        )
         print(f"    ✓ {label} ({metric_name}) present")
 
     # Spot-check labeled series
-    assert 'status="accepted"' in text, "frame_ingestion_total{status='accepted'} missing"
-    assert 'metric_type="vector_jsd"' in text, "drift_score_gauge{metric_type='vector_jsd'} missing"
+    assert 'status="accepted"' in text, (
+        "frame_ingestion_total{status='accepted'} missing"
+    )
+    assert 'metric_type="vector_jsd"' in text, (
+        "drift_score_gauge{metric_type='vector_jsd'} missing"
+    )
     print("    ✓ labeled series verified")
 
 
 # ── Orchestration ───────────────────────────────────────────────────────
+
 
 def main() -> None:
     results: Dict[str, Any] = {"checks": [], "summary": {}}
@@ -341,7 +370,9 @@ def main() -> None:
         print("=" * 60)
         print(f"  Health status     : {results['summary']['health_status']}")
         print(f"  Frames ingested   : {results['summary']['frames_ingested']}")
-        print(f"  is_drifted        : {results['summary']['eval_result']['is_drifted']}")
+        print(
+            f"  is_drifted        : {results['summary']['eval_result']['is_drifted']}"
+        )
         print(f"  Checks passed     : {', '.join(results['checks'])}")
 
     except AssertionError as e:
@@ -350,6 +381,7 @@ def main() -> None:
     except Exception as e:
         print(f"\n✗ UNEXPECTED ERROR: {e.__class__.__name__}: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     finally:

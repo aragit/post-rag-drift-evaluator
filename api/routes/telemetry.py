@@ -48,9 +48,9 @@ async def ingest_frames(
     buffer = request.app.state.ingestion_buffer
     frames = payload.frames if isinstance(payload, IngestFramesPayload) else [payload]
     await buffer.enqueue(frames)
-    FRAME_INGESTION_TOTAL.labels(
-        status="accepted", buffer_type=buffer.buffer_type
-    ).inc(len(frames))
+    FRAME_INGESTION_TOTAL.labels(status="accepted", buffer_type=buffer.buffer_type).inc(
+        len(frames)
+    )
     return {"status": "accepted", "count": len(frames)}
 
 
@@ -81,9 +81,13 @@ async def evaluate_telemetry(
     try:
         result = await monitor.evaluate_frames(baseline_frames, payload.current_frames)
     except Exception:
-        EVALUATION_LATENCY_SECONDS.labels(status="error").observe(time.monotonic() - start)
+        EVALUATION_LATENCY_SECONDS.labels(status="error").observe(
+            time.monotonic() - start
+        )
         raise
-    EVALUATION_LATENCY_SECONDS.labels(status="success").observe(time.monotonic() - start)
+    EVALUATION_LATENCY_SECONDS.labels(status="success").observe(
+        time.monotonic() - start
+    )
 
     _update_drift_gauges(result)
     return result

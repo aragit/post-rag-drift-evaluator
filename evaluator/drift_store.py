@@ -200,9 +200,9 @@ class DriftStore:
                     ORDER BY timestamp ASC
                     LIMIT $2
                     """,
-                    cutoff,
-                    limit,
-                )
+                cutoff,
+                limit,
+            )
         finally:
             await self._release(conn, owned)
 
