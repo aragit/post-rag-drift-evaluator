@@ -22,6 +22,8 @@ class EvaluatorConfig(BaseSettings):
     MMD_THRESHOLD: float = Field(default=0.1)
     PER_COMPONENT_KL_THRESHOLD: float = Field(default=0.5)
 
+    DRIFT_ALERT_WEBHOOK_URL: str | None = Field(default=None)
+
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
     EMBEDDING_CACHE_TTL: int = Field(default=3600)
     RESULT_CACHE_TTL: int = Field(default=1800)

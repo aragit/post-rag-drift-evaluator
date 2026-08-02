@@ -252,6 +252,44 @@ class DriftStore:
             data["metadata"].append(json.dumps(payload))
         return pl.DataFrame(data)
 
+    async def get_store_stats(self) -> Dict[str, Any]:
+        """Return high-level store statistics for the CLI diagnostics."""
+        conn, owned = await self._connection()
+        try:
+            total = await conn.fetchval("SELECT COUNT(*) FROM telemetry_evaluations")
+            by_type_rows = await conn.fetch(
+                """
+                SELECT rag_type, COUNT(*) AS count
+                FROM telemetry_evaluations
+                GROUP BY rag_type
+                ORDER BY rag_type
+                """
+            )
+            graph_count = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM telemetry_evaluations
+                WHERE jsonb_typeof(telemetry_frame -> 'context' -> 'graph_topology')
+                      = 'object'
+                """
+            )
+            swarm_count = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM telemetry_evaluations
+                WHERE jsonb_typeof(telemetry_frame -> 'metadata' -> 'agent_hops')
+                      = 'array'
+                """
+            )
+        finally:
+            await self._release(conn, owned)
+
+        return {
+            "total_frames": int(total or 0),
+            "by_rag_type": {row["rag_type"]: int(row["count"]) for row in by_type_rows},
+            "frames_with_graph_payloads": int(graph_count or 0),
+            "frames_with_swarm_metadata": int(swarm_count or 0),
+            "status": "healthy",
+        }
+
     async def get_latest_drift(self) -> Optional[Dict[str, Any]]:
         conn, owned = await self._connection()
         try:

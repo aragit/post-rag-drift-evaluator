@@ -5,6 +5,7 @@ from scipy.stats import gaussian_kde
 from sklearn.decomposition import PCA
 from typing import Any, Dict, List, Optional, Tuple
 
+from alerting.notifier import DriftAlertNotifier
 from evaluator.config import config
 from evaluator.drift.graph_drift import GraphDriftCalculator
 from evaluator.drift.swarm_drift import SwarmDriftCalculator
@@ -17,7 +18,10 @@ logger = get_logger("DriftMonitor")
 
 class DriftMonitor:
     def __init__(
-        self, threshold: float = config.DRIFT_THRESHOLD, store: DriftStore | None = None
+        self,
+        threshold: float = config.DRIFT_THRESHOLD,
+        store: DriftStore | None = None,
+        notifier: Optional[DriftAlertNotifier] = None,
     ):
         self.threshold = threshold
         self.mmd_threshold = config.MMD_THRESHOLD
@@ -25,6 +29,7 @@ class DriftMonitor:
         self.calibrated_thresholds: Dict[str, float] = {}
         self._calibrated = False
         self._store = store or DriftStore()
+        self.notifier = notifier
         self._graph_calculator = GraphDriftCalculator()
         self._swarm_calculator = SwarmDriftCalculator()
 
@@ -511,6 +516,9 @@ class DriftMonitor:
             "swarm_drift": swarm_drift,
             "is_drifted": is_drifted,
         }
+
+        if self.notifier is not None:
+            await self.notifier.notify_if_drifted(result)
 
         if current_frames:
             metrics = {

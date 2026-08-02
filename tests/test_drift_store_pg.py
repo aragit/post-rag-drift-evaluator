@@ -131,6 +131,28 @@ async def test_batch_store_frames_skips_empty_batch():
 
 
 @pytest.mark.asyncio
+async def test_get_store_stats_aggregates_counts():
+    conn = AsyncMock()
+    conn.fetchval = AsyncMock(side_effect=[10, 3, 4])
+    conn.fetch = AsyncMock(
+        return_value=[
+            _Row({"rag_type": "naive", "count": 5}),
+            _Row({"rag_type": "swarm", "count": 5}),
+        ]
+    )
+
+    with _patch_db(conn):
+        stats = await DriftStore().get_store_stats()
+
+    assert stats["total_frames"] == 10
+    assert stats["by_rag_type"] == {"naive": 5, "swarm": 5}
+    assert stats["frames_with_graph_payloads"] == 3
+    assert stats["frames_with_swarm_metadata"] == 4
+    assert stats["status"] == "healthy"
+    assert conn.fetchval.await_count == 3
+
+
+@pytest.mark.asyncio
 async def test_get_recent_frames_deserializes_payloads():
     conn = AsyncMock()
     stored = _frame(rag_type="swarm")
