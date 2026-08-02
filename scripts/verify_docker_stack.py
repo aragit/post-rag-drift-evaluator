@@ -36,11 +36,11 @@ os.environ.setdefault("POSTGRES_DB", "rag_db")
 os.environ.setdefault("POSTGRES_PORT", "5433")
 
 # API connection
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 HEALTH_TIMEOUT_S = 45
 POLL_BACKOFF_S = 0.5
 POLL_MAX_INTERVAL_S = 3
-FRAME_FLUSH_DELAY_S = 3
+FRAME_FLUSH_DELAY_S = int(os.environ.get("FRAME_FLUSH_DELAY_S", "3"))
 
 # ── Test data ───────────────────────────────────────────────────────────
 
@@ -136,10 +136,17 @@ def start_api_local() -> Optional[subprocess.Popen]:
     """Start the FastAPI API as a local uvicorn subprocess."""
     print("  Starting API locally via uvicorn...")
     env = os.environ.copy()
-    env["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5433/rag_db"
-    env["REDIS_URL"] = "redis://localhost:6379/0"
-    env["POSTGRES_HOST"] = "localhost"
-    env["POSTGRES_PORT"] = "5433"
+    db_host = os.environ.get("POSTGRES_HOST", "localhost")
+    db_port = os.environ.get("POSTGRES_PORT", "5432")
+    db_user = os.environ.get("POSTGRES_USER", "postgres")
+    db_pass = os.environ.get("POSTGRES_PASSWORD", "postgres")
+    db_name = os.environ.get("POSTGRES_DB", "rag_db")
+    env["DATABASE_URL"] = (
+        f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    )
+    env["REDIS_URL"] = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    env["POSTGRES_HOST"] = db_host
+    env["POSTGRES_PORT"] = db_port
     env["API_KEY_REQUIRED"] = "False"
 
     proc = subprocess.Popen(
@@ -316,22 +323,36 @@ def check_metrics() -> None:
     assert 'metric_type="vector_jsd"' in text, (
         "drift_score_gauge{metric_type='vector_jsd'} missing"
     )
-    print("    ✓ labeled series verified")
+
+
+print("    ✓ labeled series verified")
 
 
 # ── Orchestration ───────────────────────────────────────────────────────
 
 
+def _is_api_reachable() -> bool:
+    """Return True if the API is already responding on BASE_URL."""
+    try:
+        r = httpx.get(f"{BASE_URL}/healthz", timeout=2)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
 def main() -> None:
     results: Dict[str, Any] = {"checks": [], "summary": {}}
     api_proc: Optional[subprocess.Popen] = None
+    api_already_running = False
 
     try:
-        # Step 1: start backing services
-        start_docker_services()
-
-        # Start API locally (Docker image build may not be available)
-        api_proc = start_api_local()
+        # Step 1: start backing services (skipped if API already running in Docker)
+        api_already_running = _is_api_reachable()
+        if not api_already_running:
+            start_docker_services()
+            api_proc = start_api_local()
+        else:
+            print("  API already reachable — skipping local startup (Docker mode).")
 
         # Step 2: wait for readiness
         if not poll_health():
@@ -386,7 +407,8 @@ def main() -> None:
         sys.exit(1)
     finally:
         stop_api(api_proc)
-        compose_down()
+        if not api_already_running:
+            compose_down()
 
 
 if __name__ == "__main__":

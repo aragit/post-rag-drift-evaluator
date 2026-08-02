@@ -9,10 +9,12 @@ on:
 env:
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
-  POSTGRES_DB: rag_db
+  POSTGRES_DB: drift_db
   POSTGRES_HOST: localhost
-  POSTGRES_PORT: 5432
-  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rag_db
+  POSTGRES_PORT: "5433"
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5433/drift_db
+  REDIS_URL: redis://localhost:6379/0
+  LITELLM_MASTER_KEY: sk-mock-key-1234
 
 jobs:
   lint-and-test:
@@ -26,9 +28,9 @@ jobs:
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d drift_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -38,7 +40,7 @@ jobs:
         ports:
           - 6379:6379
         options: >-
-          --health-cmd redis-cli ping
+          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 3s
           --health-retries 5
@@ -50,14 +52,9 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
           cache-dependency-path: pyproject.toml
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[dev]
 
       - name: Cache pip wheels
         uses: actions/cache@v4
@@ -66,6 +63,11 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
 
       - name: Run Ruff Linter
         run: ruff check .
@@ -76,9 +78,15 @@ jobs:
       - name: Run Mypy Static Type Check
         run: mypy --ignore-missing-imports evaluator/ api/
 
-      - name: Run Test Suite
+      - name: Execute Test Suite
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5433
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: drift_db
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/drift_db
+          REDIS_URL: redis://localhost:6379/0
           LITELLM_MASTER_KEY: sk-mock-key-1234
         run: |
           pytest tests/ -v --durations=10
@@ -86,31 +94,6 @@ jobs:
   docker-build-and-verify:
     runs-on: ubuntu-latest
     needs: lint-and-test
-
-    services:
-      postgres:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd redis-cli ping
-          --health-interval 10s
-          --health-timeout 3s
-          --health-retries 5
 
     steps:
       - name: Checkout Source Code
@@ -135,22 +118,34 @@ jobs:
             -t drift-engine:latest .
 
       - name: Start services via Docker Compose
-        run: |
-          docker compose up -d db redis
-          sleep 10
-
-      - name: Health check
-        run: |
-          curl -f http://localhost:5432 || true
-          docker compose exec -T db pg_isready -U postgres -d rag_db
-
-      - name: Run verification script
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          REDIS_URL: redis://localhost:6379/0
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rag_db
+          POSTGRES_PORT: 5432
+        run: |
+          docker compose up -d --build
+          echo "Waiting for Docker services to be ready..."
+          timeout 60 bash -c 'until docker compose exec -T db pg_isready -U postgres -d rag_db; do sleep 2; done'
+
+      - name: Wait for API readiness
+        run: |
+          echo "Waiting for API readiness..."
+          timeout 60 bash -c 'until curl -sf http://localhost:8000/readyz; do sleep 2; done'
+
+      - name: Run e2e verification
+        env:
+          API_BASE_URL: http://localhost:8000
+          POSTGRES_HOST: db
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rag_db
+          REDIS_URL: redis://redis:6379/0
+          DATABASE_URL: postgresql://postgres:postgres@db:5432/rag_db
         run: |
           python scripts/verify_docker_stack.py
 
-      - name: Tear down
+      - name: Tear down Docker Compose
         if: always()
         run: docker compose down -v
