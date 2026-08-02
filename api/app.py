@@ -4,30 +4,39 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
+from api.routes.health import router as health_router
+from api.routes.metrics import router as metrics_router
 from api.routes.telemetry import router as telemetry_router
+from evaluator.baseline_service import DynamicBaselineService
+from evaluator.config import config
 from evaluator.db import pool as db_pool
 from evaluator.drift_monitor import DriftMonitor
 from evaluator.drift_store import DriftStore
 from evaluator.logging_config import get_logger
-from ingestion.queue import AsyncIngestionBuffer
+from ingestion.queue import AsyncIngestionBuffer, get_ingestion_buffer
+from ingestion.redis_queue import RedisStreamBuffer
 
 logger = get_logger("api.app")
 
 
 def create_app(
     store: Optional[DriftStore] = None,
-    buffer: Optional[AsyncIngestionBuffer] = None,
+    buffer: Optional[AsyncIngestionBuffer | RedisStreamBuffer] = None,
     monitor: Optional[DriftMonitor] = None,
 ) -> FastAPI:
     """Build the drift ingestion gateway.
 
     ``store``/``buffer``/``monitor`` may be injected (e.g. fakes) for tests;
-    defaults wire up the real Postgres-backed ``DriftStore``.
+    defaults wire up the real Postgres-backed ``DriftStore`` and a durable
+    Redis Streams buffer (with graceful fallback to the in-memory queue).
     """
     store = store or DriftStore()
-    buffer = buffer or AsyncIngestionBuffer()
-    monitor = monitor or DriftMonitor(store=store)
+    if buffer is None:
+        buffer = get_ingestion_buffer(config, store)
+    baseline_service = DynamicBaselineService(store=store)
+    monitor = monitor or DriftMonitor(store=store, baseline_service=baseline_service)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -53,6 +62,17 @@ def create_app(
     application.state.ingestion_buffer = buffer
     application.state.drift_store = store
     application.state.drift_monitor = monitor
+
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    application.include_router(health_router)
+    application.include_router(metrics_router)
     application.include_router(telemetry_router)
     return application
 

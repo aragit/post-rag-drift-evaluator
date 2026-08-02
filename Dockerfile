@@ -1,31 +1,41 @@
-# Stage 1: Build dependencies
+# syntax=docker/dockerfile:1
+# ────────────────────────────────────────────── Stage 1: builder
 FROM python:3.11-slim AS builder
 
-WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VIRTUAL_ENV=/opt/venv
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-# Stage 2: Final minimal runtime
-FROM python:3.11-slim AS runtime
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 WORKDIR /app
+COPY pyproject.toml ./
+RUN pip install --upgrade pip && \
+    pip install .
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/*
+# ────────────────────────────────────────────── Stage 2: runner
+FROM python:3.11-slim AS runner
 
-COPY --from=builder /root/.local /root/.local
-COPY . .
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv
 
-ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONUNBUFFERED=1
+RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m appuser
+
+WORKDIR /app
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY . /app/
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=2)" || exit 1
 
 EXPOSE 8000
-
-ENTRYPOINT ["python", "-m", "evaluator.benchmark"]
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]

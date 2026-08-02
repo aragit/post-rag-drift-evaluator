@@ -63,6 +63,11 @@ class FakeRepo:
     ) -> List[RAGEvaluationFrame]:
         return self.recent
 
+    async def get_frames_by_time_window(
+        self, hours: int = 24, limit: int = 100
+    ) -> List[RAGEvaluationFrame]:
+        return self.recent
+
     async def close(self) -> None:
         self.closed = True
 
@@ -188,7 +193,8 @@ async def test_evaluate_returns_multi_modal_drift():
     assert len(repo.recorded) == len(current)
 
 
-async def test_evaluate_requires_baseline_source():
+async def test_evaluate_uses_dynamic_baseline_fallback():
+    """When no baseline source is provided, dynamic baseline is fetched."""
     repo = FakeRepo()
     app = create_app(store=repo)
 
@@ -198,7 +204,15 @@ async def test_evaluate_requires_baseline_source():
             json={"current_frames": [_frame_json(_frame())]},
         )
 
-    assert response.status_code == 422
+    assert response.status_code == 200
+    payload = response.json()
+    assert set(payload) == {
+        "vector_drift",
+        "graph_drift",
+        "swarm_drift",
+        "is_drifted",
+    }
+    assert payload["is_drifted"] is False
 
 
 async def test_evaluate_uses_baseline_batch_id():

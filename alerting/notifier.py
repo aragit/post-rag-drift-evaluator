@@ -20,6 +20,12 @@ logger = get_logger("DriftAlertNotifier")
 ALERT_TIMEOUT_SECONDS = 5.0
 
 
+def _drift_alerts_total():
+    """Lazy resolver for the Prometheus counter to avoid circular imports."""
+    from api.metrics import DRIFT_ALERTS_TOTAL
+    return DRIFT_ALERTS_TOTAL
+
+
 class DriftAlertNotifier:
     """Dispatch structured drift alerts to a configured webhook URL."""
 
@@ -78,6 +84,7 @@ class DriftAlertNotifier:
                 response = await client.post(self.webhook_url, json=payload)
                 response.raise_for_status()
         except Exception as exc:  # noqa: BLE001 - alerting must not break evaluation
+            _drift_alerts_total().labels(status="failed").inc()
             logger.error("Alert dispatch to %s failed: %s", self.webhook_url, exc)
             return False
 
@@ -86,4 +93,5 @@ class DriftAlertNotifier:
             self.webhook_url,
             response.status_code,
         )
+        _drift_alerts_total().labels(status="dispatched").inc()
         return True

@@ -22,6 +22,7 @@ class DriftMonitor:
         threshold: float = config.DRIFT_THRESHOLD,
         store: DriftStore | None = None,
         notifier: Optional[DriftAlertNotifier] = None,
+        baseline_service: Optional[object] = None,
     ):
         self.threshold = threshold
         self.mmd_threshold = config.MMD_THRESHOLD
@@ -32,6 +33,8 @@ class DriftMonitor:
         self.notifier = notifier
         self._graph_calculator = GraphDriftCalculator()
         self._swarm_calculator = SwarmDriftCalculator()
+        self._baseline_service = baseline_service
+        self._saved_thresholds: Optional[Dict[str, Any]] = None
 
     def calibrate_thresholds(
         self, baseline_embeddings: np.ndarray, n_bootstrap: int = 1000
@@ -489,20 +492,102 @@ class DriftMonitor:
             baseline_metadata, current_metadata
         )
 
+    def _apply_calibrated_thresholds(self, thresholds: Dict[str, float]) -> None:
+        if not thresholds:
+            return
+        self._saved_thresholds = {
+            "jsd": self.threshold,
+            "mmd": self.mmd_threshold,
+            "kl": self.per_component_kl_threshold,
+            "spectral": self._graph_calculator.spectral_threshold,
+            "graph_density": self._graph_calculator.density_threshold,
+            "entropy": self._swarm_calculator.entropy_threshold,
+            "reflection": self._swarm_calculator.reflection_threshold,
+            "calibrated": self._calibrated,
+            "calibrated_thresholds": dict(self.calibrated_thresholds),
+        }
+        self.threshold = thresholds.get(
+            "vector_jsd_threshold", self._saved_thresholds["jsd"]
+        )
+        self.mmd_threshold = thresholds.get(
+            "vector_mmd_threshold", self._saved_thresholds["mmd"]
+        )
+        self._graph_calculator.spectral_threshold = thresholds.get(
+            "graph_spectral_threshold", self._saved_thresholds["spectral"]
+        )
+        self._swarm_calculator.entropy_threshold = thresholds.get(
+            "swarm_entropy_threshold", self._saved_thresholds["entropy"]
+        )
+        self._calibrated = True
+        self.calibrated_thresholds = dict(thresholds)
+
+    def _restore_thresholds(self) -> None:
+        if self._saved_thresholds is None:
+            return
+        self.threshold = self._saved_thresholds["jsd"]
+        self.mmd_threshold = self._saved_thresholds["mmd"]
+        self.per_component_kl_threshold = self._saved_thresholds["kl"]
+        self._graph_calculator.spectral_threshold = self._saved_thresholds["spectral"]
+        self._graph_calculator.density_threshold = self._saved_thresholds["graph_density"]
+        self._swarm_calculator.entropy_threshold = self._saved_thresholds["entropy"]
+        self._swarm_calculator.reflection_threshold = self._saved_thresholds["reflection"]
+        self._calibrated = self._saved_thresholds["calibrated"]
+        self.calibrated_thresholds = self._saved_thresholds["calibrated_thresholds"]
+        self._saved_thresholds = None
+
     async def evaluate_frames(
         self,
-        baseline_frames: List[RAGEvaluationFrame],
-        current_frames: List[RAGEvaluationFrame],
+        baseline_frames: Optional[List[RAGEvaluationFrame]] = None,
+        current_frames: Optional[List[RAGEvaluationFrame]] = None,
     ) -> Dict[str, Any]:
         """Evaluate hybrid vector/graph/swarm drift between two windows.
 
         Results are keyed as ``vector_drift``, ``graph_drift``,
         ``swarm_drift``, and ``is_drifted``. When ``current_frames`` is
         non-empty, each current frame is persisted via ``record_evaluation``.
+
+        If *baseline_frames* is ``None`` or empty and a ``baseline_service``
+        is attached, a sliding-window baseline is fetched and dynamically
+        calibrated thresholds (``mu + k*sigma``) are applied.  When fewer
+        than ``MIN_BASELINE_FRAMES`` are available, static safety thresholds
+        are used as a graceful fallback.
         """
-        vector_drift = self._evaluate_vector_drift(baseline_frames, current_frames)
-        graph_drift = self._evaluate_graph_drift(baseline_frames, current_frames)
-        swarm_drift = self._evaluate_swarm_drift(baseline_frames, current_frames)
+        if current_frames is None:
+            current_frames = []
+
+        baseline_source: str = "explicit"
+
+        if not baseline_frames and self._baseline_service is not None:
+            baseline_frames = await self._baseline_service.fetch_sliding_baseline_frames()
+            baseline_source = "dynamic"
+            logger.info(
+                "Fetched %d dynamic baseline frames for evaluation.",
+                len(baseline_frames) if baseline_frames else 0,
+            )
+
+            thresholds = self._baseline_service.compute_calibrated_thresholds(
+                baseline_frames or []
+            )
+            if thresholds:
+                self._apply_calibrated_thresholds(thresholds)
+                logger.info(
+                    "Applied dynamically calibrated thresholds: %s", thresholds
+                )
+            else:
+                logger.info(
+                    "Falling back to static thresholds (insufficient baseline frames)."
+                )
+
+        if not baseline_frames:
+            baseline_frames = []
+
+        try:
+            vector_drift = self._evaluate_vector_drift(baseline_frames, current_frames)
+            graph_drift = self._evaluate_graph_drift(baseline_frames, current_frames)
+            swarm_drift = self._evaluate_swarm_drift(baseline_frames, current_frames)
+        finally:
+            if baseline_source == "dynamic":
+                self._restore_thresholds()
 
         is_drifted = (
             bool(vector_drift["is_drifted"])

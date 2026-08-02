@@ -177,6 +177,50 @@ class DriftStore:
                 )
         return frames
 
+    async def get_frames_by_time_window(
+        self,
+        hours: int = 24,
+        limit: int = 100,
+    ) -> List[RAGEvaluationFrame]:
+        """Fetch evaluation frames within a sliding *hours* window.
+
+        Frames are returned oldest-first so they can be used for chronological
+        analysis and sliding-baseline threshold calibration.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        conn, owned = await self._connection()
+        try:
+            rows = await conn.fetch(
+                """
+                    SELECT telemetry_frame
+                    FROM telemetry_evaluations
+                    WHERE timestamp >= $1
+                    ORDER BY timestamp ASC
+                    LIMIT $2
+                    """,
+                    cutoff,
+                    limit,
+                )
+        finally:
+            await self._release(conn, owned)
+
+        frames: List[RAGEvaluationFrame] = []
+        for row in rows:
+            raw = row["telemetry_frame"]
+            try:
+                if isinstance(raw, str):
+                    frames.append(RAGEvaluationFrame.model_validate_json(raw))
+                else:
+                    frames.append(RAGEvaluationFrame.model_validate(raw))
+            except Exception as e:  # noqa: BLE001 - legacy/foreign payloads tolerated
+                logger.warning(
+                    "Skipping non-frame telemetry row during time-window retrieval: %s",
+                    e,
+                )
+        return frames
+
     async def record_drift(self, drift_result: Dict[str, Any]) -> str:
         """Legacy adapter: persist a distribution-level drift computation.
 
