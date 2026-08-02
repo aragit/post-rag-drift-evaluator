@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from fastapi import HTTPException, Request
 from starlette.status import HTTP_401_UNAUTHORIZED
 

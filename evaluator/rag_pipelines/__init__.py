@@ -12,14 +12,14 @@ from evaluator.rag_pipelines.base import (
 from evaluator.rag_pipelines.naive_rag import NaiveRAG
 
 __all__ = [
+    "AgenticRAG",
     "BaseRAGPipeline",
-    "RAGResponse",
-    "RAGEvaluationFrame",
     "ExecutionMetadataPayload",
     "GraphTopologyPayload",
+    "NaiveRAG",
     "OutputPayload",
     "QueryPayload",
+    "RAGEvaluationFrame",
+    "RAGResponse",
     "RetrievalContextPayload",
-    "NaiveRAG",
-    "AgenticRAG",
 ]

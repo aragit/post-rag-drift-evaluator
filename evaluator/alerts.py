@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel
@@ -64,7 +64,7 @@ class AlertManager:
             jsd_score=jsd_score,
             mmd_score=mmd_score,
             threshold=threshold,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=timezone.utc),
             message=f"Drift detected: JSD={jsd_score:.4f}, threshold={threshold}",
             correlation_id=correlation_id,
         )

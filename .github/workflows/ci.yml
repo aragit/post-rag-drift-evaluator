@@ -70,7 +70,9 @@ jobs:
           pip install .[dev]
 
       - name: Run Ruff Linter
-        run: ruff check .
+        run: |
+          rm -rf build/ dist/ *.egg-info
+          ruff check .
 
       - name: Run Ruff Format Check
         run: ruff format --check .
