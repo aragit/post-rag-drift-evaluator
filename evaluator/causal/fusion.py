@@ -296,8 +296,12 @@ class CausalLatentFusionEngine:
             metadata={
                 **dict(graph.metadata),
                 "fusion_source": "dual_track_drift",
-                "retrieval_score": retrieval_result.drift_score if retrieval_result else 0.0,
-                "generation_score": generation_result.drift_score if generation_result else 0.0,
+                "retrieval_score": retrieval_result.drift_score
+                if retrieval_result
+                else 0.0,
+                "generation_score": generation_result.drift_score
+                if generation_result
+                else 0.0,
                 "sensitivity": self.sensitivity,
             },
         )

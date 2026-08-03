@@ -40,9 +40,7 @@ def _populate_store(store_path: str) -> None:
     store = JSONHistoryStore(store_path)
     for i in range(5):
         store.save(
-            make_drift_record(
-                f"r{i}", timestamp=i, value=0.05, system_version="0.1.0"
-            )
+            make_drift_record(f"r{i}", timestamp=i, value=0.05, system_version="0.1.0")
         )
     for i in range(5, 10):
         store.save(

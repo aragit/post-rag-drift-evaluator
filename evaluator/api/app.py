@@ -131,6 +131,7 @@ def create_production_app(
     if store_path is None:
         fd, store_path = tempfile.mkstemp(suffix=".jsonl")
         import os
+
         os.close(fd)
 
     @asynccontextmanager
@@ -145,8 +146,12 @@ def create_production_app(
 
     application.state.store_path = store_path
     application.state.store = JSONHistoryStore(store_path)
-    application.state.stream_buffer = StreamingDriftBuffer(capacity=1000, sample_strategy="reservoir")
-    application.state.optimization_engine = OptimizationEngine(min_confidence=min_confidence)
+    application.state.stream_buffer = StreamingDriftBuffer(
+        capacity=1000, sample_strategy="reservoir"
+    )
+    application.state.optimization_engine = OptimizationEngine(
+        min_confidence=min_confidence
+    )
     application.state.policy_evaluator = PolicyEvaluator()
     application.state.runner = OptimizationRunner(
         engine=application.state.optimization_engine,
@@ -185,6 +190,7 @@ def create_production_app(
         )
 
         from evaluator.config import config
+
         pca_components = request.pca_components or config.PCA_COMPONENTS
 
         result = compute_latent_drift(
@@ -215,12 +221,14 @@ def create_production_app(
 
         # Build in-memory store from provided records
         from evaluator.storage import EvaluationRecord
+
         in_memory = InMemoryHistoryStore()
         for rec_data in request.store_records:
             in_memory.append(EvaluationRecord.from_dict(rec_data))
 
         # Reconstruct execution history as OptimizationAction objects
         from evaluator.optimization.models import OptimizationAction
+
         exec_history = [
             OptimizationAction.from_dict(h) for h in request.execution_history
         ]
@@ -301,6 +309,7 @@ def create_production_app(
         """Ingest a single embedding vector into the streaming drift buffer."""
         buffer = application.state.stream_buffer
         import numpy as np
+
         vector = np.array(request.vector, dtype=float)
         buffer.ingest(vector, track=request.track)
         return StreamIngestResponse(
@@ -349,7 +358,9 @@ def create_production_app(
         # against a synthetic baseline (or the engine handles unfitted gracefully)
         # For this endpoint, we just return raw detection
         baseline = EmbeddingBatch(
-            vectors=np.random.RandomState(42).normal(0, 1, size=(100, track_batch.vectors.shape[1])),
+            vectors=np.random.RandomState(42).normal(
+                0, 1, size=(100, track_batch.vectors.shape[1])
+            ),
             track=track,
         )
         current = EmbeddingBatch(
@@ -381,6 +392,7 @@ def create_production_app(
 def np_array(vectors: list[list[float]]) -> Any:
     """Convert a list of lists to a numpy array."""
     import numpy as np
+
     return np.array(vectors)
 
 

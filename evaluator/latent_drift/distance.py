@@ -31,8 +31,8 @@ def _rbf_kernel(
     Y = np.atleast_2d(Y)
 
     # (n_x, 1, d) - (1, n_y, d) -> (n_x, n_y, d) -> sum -> (n_x, n_y)
-    XX = np.sum(X ** 2, axis=1)[:, None]
-    YY = np.sum(Y ** 2, axis=1)[None, :]
+    XX = np.sum(X**2, axis=1)[:, None]
+    YY = np.sum(Y**2, axis=1)[None, :]
     cross = 2.0 * X @ Y.T
     dist_sq = XX - cross + YY
     dist_sq = np.maximum(dist_sq, 0.0)  # numerical guard
@@ -50,8 +50,8 @@ def _median_heuristic_gamma(X: np.ndarray, Y: np.ndarray) -> float:
     X = np.atleast_2d(X)
     Y = np.atleast_2d(Y)
 
-    XX = np.sum(X ** 2, axis=1)[:, None]
-    YY = np.sum(Y ** 2, axis=1)[None, :]
+    XX = np.sum(X**2, axis=1)[:, None]
+    YY = np.sum(Y**2, axis=1)[None, :]
     cross = 2.0 * X @ Y.T
     dist_sq = XX - cross + YY
     dist_sq = np.maximum(dist_sq, 0.0)
@@ -62,7 +62,7 @@ def _median_heuristic_gamma(X: np.ndarray, Y: np.ndarray) -> float:
     if median_dist < 1e-12:
         return 1.0
 
-    return 1.0 / (2.0 * median_dist ** 2)
+    return 1.0 / (2.0 * median_dist**2)
 
 
 def compute_mmd(
@@ -104,18 +104,16 @@ def compute_mmd(
     K_yy = _rbf_kernel(Y, Y, gamma)
     K_xy = _rbf_kernel(X, Y, gamma)
 
-    mmd_sq = (
-        np.mean(K_xx)
-        + np.mean(K_yy)
-        - 2.0 * np.mean(K_xy)
-    )
+    mmd_sq = np.mean(K_xx) + np.mean(K_yy) - 2.0 * np.mean(K_xy)
 
     # Square root to get MMD (not squared), then clip
     mmd = float(np.sqrt(max(mmd_sq, 0.0)))
     return float(np.clip(mmd, 0.0, 1.0))
 
 
-def _random_projections(n_features: int, n_projections: int, seed: int = 42) -> np.ndarray:
+def _random_projections(
+    n_features: int, n_projections: int, seed: int = 42
+) -> np.ndarray:
     """Generate random unit vectors for Sliced Wasserstein Distance.
 
     Samples vectors from a unit sphere in ``n_features`` dimensions.

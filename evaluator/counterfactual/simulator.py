@@ -178,8 +178,7 @@ def run_counterfactual_analysis(
             cf = scenario.interventions[0].metadata.get("factor_score", 0.0)
         else:
             scores = [
-                i.metadata.get("factor_score", 0.0)
-                for i in scenario.interventions
+                i.metadata.get("factor_score", 0.0) for i in scenario.interventions
             ]
             cf = min(scores) if scores else 0.0
 

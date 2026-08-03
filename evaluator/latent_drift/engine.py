@@ -121,7 +121,9 @@ class LatentDriftEngine:
             )
 
         current_vectors = np.atleast_2d(current_vectors)
-        baseline_proj = self._baseline_proj if self._baseline_proj is not None else np.empty((0, 0))
+        baseline_proj = (
+            self._baseline_proj if self._baseline_proj is not None else np.empty((0, 0))
+        )
 
         current_proj = project_vectors(self.pca, current_vectors)
 
@@ -214,10 +216,12 @@ class LatentDriftEngine:
             A dict with keys ``"retrieval"``, ``"generation"``, and
             ``"unified"``, each mapping to a :class:`LatentDriftResult`.
         """
-        baseline_vectors = np.vstack([
-            np.atleast_2d(baseline_retrieval),
-            np.atleast_2d(baseline_generation),
-        ])
+        baseline_vectors = np.vstack(
+            [
+                np.atleast_2d(baseline_retrieval),
+                np.atleast_2d(baseline_generation),
+            ]
+        )
 
         self.fit(baseline_vectors)
 
@@ -225,7 +229,9 @@ class LatentDriftEngine:
         n_base_retrieval = np.atleast_2d(baseline_retrieval).shape[0]
         n_base_generation = np.atleast_2d(baseline_generation).shape[0]
         base_ret_proj = base_proj[:n_base_retrieval]
-        base_gen_proj = base_proj[n_base_retrieval:n_base_retrieval + n_base_generation]
+        base_gen_proj = base_proj[
+            n_base_retrieval : n_base_retrieval + n_base_generation
+        ]
 
         cur_ret_proj = project_vectors(self.pca, np.atleast_2d(current_retrieval))
         cur_gen_proj = project_vectors(self.pca, np.atleast_2d(current_generation))
@@ -397,9 +403,7 @@ def detect_latent_drift_events(
     if not result.drift_detected:
         return []
 
-    start_ts = (
-        current.timestamp.timestamp() if current.timestamp else 0.0
-    )
+    start_ts = current.timestamp.timestamp() if current.timestamp else 0.0
 
     event = DriftEvent(
         metric_name=f"latent_{metric}",

@@ -41,7 +41,9 @@ def make_drift_record(
     )
 
 
-def _make_store_with_drift(track: str = "unified") -> tuple[JSONHistoryStore, DriftEvent]:
+def _make_store_with_drift(
+    track: str = "unified",
+) -> tuple[JSONHistoryStore, DriftEvent]:
     tmpdir = tempfile.mkdtemp()
     store = JSONHistoryStore(os.path.join(tmpdir, "h.jsonl"))
 

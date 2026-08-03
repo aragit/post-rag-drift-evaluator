@@ -251,10 +251,14 @@ def test_apply_intervention_remove_reverts_metadata():
     store = JSONHistoryStore(os.path.join(tmpdir, "h.jsonl"))
 
     store.save(
-        make_drift_record("r1", timestamp=1.0, value=0.05, metadata={"temperature": 0.7})
+        make_drift_record(
+            "r1", timestamp=1.0, value=0.05, metadata={"temperature": 0.7}
+        )
     )
     store.save(
-        make_drift_record("r2", timestamp=2.0, value=0.30, metadata={"temperature": 0.9})
+        make_drift_record(
+            "r2", timestamp=2.0, value=0.30, metadata={"temperature": 0.9}
+        )
     )
 
     change_id = _get_first_change_id(store)
@@ -270,10 +274,14 @@ def test_apply_intervention_modify_overrides_metadata():
     store = JSONHistoryStore(os.path.join(tmpdir, "h.jsonl"))
 
     store.save(
-        make_drift_record("r1", timestamp=1.0, value=0.05, metadata={"temperature": 0.7})
+        make_drift_record(
+            "r1", timestamp=1.0, value=0.05, metadata={"temperature": 0.7}
+        )
     )
     store.save(
-        make_drift_record("r2", timestamp=2.0, value=0.30, metadata={"temperature": 0.9})
+        make_drift_record(
+            "r2", timestamp=2.0, value=0.30, metadata={"temperature": 0.9}
+        )
     )
 
     change_id = _get_first_change_id(store)
@@ -321,9 +329,13 @@ def test_apply_scenario_multiple_interventions():
 def test_estimate_metric_pre_window_mean():
     store, drift_event = _make_store_with_drift()
     change_id = _get_first_change_id(store)
-    new_store = apply_intervention(store, Intervention(action="remove", change_id=change_id))
+    new_store = apply_intervention(
+        store, Intervention(action="remove", change_id=change_id)
+    )
 
-    estimate = estimate_metric_after_intervention(drift_event, new_store, "js_divergence")
+    estimate = estimate_metric_after_intervention(
+        drift_event, new_store, "js_divergence"
+    )
 
     # Pre-window records (r0, r1, r2) all have value 0.05
     assert round(estimate, 6) == 0.05
@@ -370,7 +382,9 @@ def test_estimate_metric_empty_store():
 def test_estimate_metric_deterministic():
     store, drift_event = _make_store_with_drift()
     change_id = _get_first_change_id(store)
-    new_store = apply_intervention(store, Intervention(action="remove", change_id=change_id))
+    new_store = apply_intervention(
+        store, Intervention(action="remove", change_id=change_id)
+    )
 
     e1 = estimate_metric_after_intervention(drift_event, new_store, "js_divergence")
     e2 = estimate_metric_after_intervention(drift_event, new_store, "js_divergence")

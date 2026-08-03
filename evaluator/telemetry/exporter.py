@@ -85,15 +85,14 @@ class SentrixMetricsExporter:
 
         try:
             import importlib.util as _ilu
+
             if not _ilu.util.find_spec("opentelemetry"):
                 return _NoopMeter()
             from opentelemetry import metrics
             from opentelemetry.sdk.metrics import MeterProvider
             from opentelemetry.sdk.resources import Resource
 
-            resource = Resource.create(
-                {"service.name": self.service_name}
-            )
+            resource = Resource.create({"service.name": self.service_name})
             provider = MeterProvider(resource=resource)
             metrics.set_meter_provider(provider)
             return metrics.get_meter("sentrix-evaluator")

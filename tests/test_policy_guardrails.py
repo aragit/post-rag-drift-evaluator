@@ -40,7 +40,11 @@ def test_cooldown_allows_different_action_types():
     evaluator = PolicyEvaluator(cooldown_period_s=300.0)
     now = time.time()
 
-    hist = [_make_action(action_type="adjust_temperature", target_run_id="r1", executed_at=now - 60)]
+    hist = [
+        _make_action(
+            action_type="adjust_temperature", target_run_id="r1", executed_at=now - 60
+        )
+    ]
     action = _make_action(action_type="adjust_top_k", target_run_id="r1")
 
     result = evaluator.validate_action(action, hist)
@@ -53,8 +57,17 @@ def test_cooldown_blocks_identical_action_within_window():
     evaluator = PolicyEvaluator(cooldown_period_s=300.0)
     now = time.time()
 
-    hist = [_make_action(action_type="rollback_config", target_run_id="r1", change_id="c1", executed_at=now - 10)]
-    action = _make_action(action_type="rollback_config", target_run_id="r1", change_id="c1")
+    hist = [
+        _make_action(
+            action_type="rollback_config",
+            target_run_id="r1",
+            change_id="c1",
+            executed_at=now - 10,
+        )
+    ]
+    action = _make_action(
+        action_type="rollback_config", target_run_id="r1", change_id="c1"
+    )
 
     result = evaluator.validate_action(action, hist)
     assert not result.allowed
@@ -66,8 +79,17 @@ def test_cooldown_allows_identical_action_after_window():
     evaluator = PolicyEvaluator(cooldown_period_s=300.0)
     now = time.time()
 
-    hist = [_make_action(action_type="rollback_config", target_run_id="r1", change_id="c1", executed_at=now - 400)]
-    action = _make_action(action_type="rollback_config", target_run_id="r1", change_id="c1")
+    hist = [
+        _make_action(
+            action_type="rollback_config",
+            target_run_id="r1",
+            change_id="c1",
+            executed_at=now - 400,
+        )
+    ]
+    action = _make_action(
+        action_type="rollback_config", target_run_id="r1", change_id="c1"
+    )
 
     result = evaluator.validate_action(action, hist)
     assert result.allowed
@@ -133,9 +155,7 @@ def test_parameter_bounds_allows_valid_top_k():
 
 def test_parameter_bounds_custom_bounds():
     """Custom bounds should override defaults."""
-    evaluator = PolicyEvaluator(
-        custom_bounds={"top_k": (1.0, 10.0)}
-    )
+    evaluator = PolicyEvaluator(custom_bounds={"top_k": (1.0, 10.0)})
     action = _make_action(
         action_type="adjust_top_k",
         params={"top_k": 15},

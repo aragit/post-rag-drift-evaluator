@@ -46,6 +46,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
 
     count = 0
     from evaluator.storage.models import EvaluationRecord
+
     for record_data in records:
         record = EvaluationRecord.from_dict(record_data)
         store.save(record)
@@ -72,8 +73,10 @@ def cmd_drift(args: argparse.Namespace) -> int:
 
     print(f"Found {len(events)} drift event(s):")
     for event in events:
-        print(f"  - {event.metric_name}: magnitude={event.magnitude:.4f}, "
-              f"run_ids={event.involved_run_ids[:3]}")
+        print(
+            f"  - {event.metric_name}: magnitude={event.magnitude:.4f}, "
+            f"run_ids={event.involved_run_ids[:3]}"
+        )
 
     return 0
 
@@ -155,7 +158,9 @@ def cmd_stream(args: argparse.Namespace) -> int:
         buffer.ingest(np.array(vector, dtype=float), track=track)
         lines_read += 1
 
-    print(f"Ingested {lines_read} vector(s) into streaming buffer (capacity={args.capacity})")
+    print(
+        f"Ingested {lines_read} vector(s) into streaming buffer (capacity={args.capacity})"
+    )
     print(f"Buffer sizes: {buffer.sizes}")
 
     if args.flush:
@@ -173,7 +178,9 @@ def cmd_stream(args: argparse.Namespace) -> int:
             return 0
 
         baseline = EmbeddingBatch(
-            vectors=np.random.RandomState(42).normal(0, 1, size=(100, track_batch.vectors.shape[1])),
+            vectors=np.random.RandomState(42).normal(
+                0, 1, size=(100, track_batch.vectors.shape[1])
+            ),
             track=track,
         )
         current = EmbeddingBatch(
@@ -188,7 +195,9 @@ def cmd_stream(args: argparse.Namespace) -> int:
             metric=args.metric,
             pca_components=min(5, track_batch.vectors.shape[1]),
         )
-        print(f"Drift score: {result.drift_score:.4f} (threshold={result.threshold:.4f})")
+        print(
+            f"Drift score: {result.drift_score:.4f} (threshold={result.threshold:.4f})"
+        )
         print(f"Drift detected: {result.drift_detected}")
         print(f"Metric: {result.metric_used}, Track: {result.track}")
 
@@ -221,24 +230,40 @@ def main(argv: list[str] | None = None) -> int:
     drift_parser.set_defaults(func=cmd_drift)
 
     # remediate command
-    remediate_parser = subparsers.add_parser("remediate", help="Run optimization pipeline")
+    remediate_parser = subparsers.add_parser(
+        "remediate", help="Run optimization pipeline"
+    )
     remediate_parser.add_argument("--store", required=True, help="Path to JSONL store")
-    remediate_parser.add_argument("--metric", default="js_divergence", help="Metric name")
-    remediate_parser.add_argument("--window-size", type=int, default=3, help="Window size")
-    remediate_parser.add_argument("--threshold", type=float, default=0.15, help="Threshold")
+    remediate_parser.add_argument(
+        "--metric", default="js_divergence", help="Metric name"
+    )
+    remediate_parser.add_argument(
+        "--window-size", type=int, default=3, help="Window size"
+    )
+    remediate_parser.add_argument(
+        "--threshold", type=float, default=0.15, help="Threshold"
+    )
     remediate_parser.add_argument("--top-k", type=int, default=3, help="Top K factors")
     remediate_parser.set_defaults(func=cmd_remediate)
 
     # stream command
-    stream_parser = subparsers.add_parser("stream", help="Ingest streaming embedding vectors")
+    stream_parser = subparsers.add_parser(
+        "stream", help="Ingest streaming embedding vectors"
+    )
     stream_parser.add_argument(
         "--capacity", type=int, default=1000, help="Buffer capacity"
     )
     stream_parser.add_argument(
-        "--strategy", choices=["reservoir", "fifo"], default="reservoir", help="Buffer overflow strategy"
+        "--strategy",
+        choices=["reservoir", "fifo"],
+        default="reservoir",
+        help="Buffer overflow strategy",
     )
     stream_parser.add_argument(
-        "--track", default="retrieval", choices=["retrieval", "generation"], help="Embedding track"
+        "--track",
+        default="retrieval",
+        choices=["retrieval", "generation"],
+        help="Embedding track",
     )
     stream_parser.add_argument(
         "--metric", default="mmd", help="Drift metric (mmd, swd, jsd)"
@@ -247,10 +272,14 @@ def main(argv: list[str] | None = None) -> int:
         "--threshold", type=float, default=0.15, help="Drift threshold"
     )
     stream_parser.add_argument(
-        "--flush", action="store_true", help="Flush after ingestion and run drift detection"
+        "--flush",
+        action="store_true",
+        help="Flush after ingestion and run drift detection",
     )
     stream_parser.add_argument(
-        "--input", default="-", help="Path to JSONL file (default: stdin, use '-' for stdin)"
+        "--input",
+        default="-",
+        help="Path to JSONL file (default: stdin, use '-' for stdin)",
     )
     stream_parser.set_defaults(func=cmd_stream)
 

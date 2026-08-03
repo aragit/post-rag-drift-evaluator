@@ -15,7 +15,9 @@ def test_manager_initial_threshold():
 
 def test_manager_updates_threshold():
     """After adding scores, threshold adapts via z-score."""
-    manager = AdaptiveThresholdManager(base_threshold=0.15, sensitivity_z=2.0, min_threshold=0.0, max_threshold=1.0)
+    manager = AdaptiveThresholdManager(
+        base_threshold=0.15, sensitivity_z=2.0, min_threshold=0.0, max_threshold=1.0
+    )
 
     # Low variance: threshold should be near mean + z*std
     for v in [0.04, 0.05, 0.06, 0.05, 0.04, 0.06, 0.05, 0.04, 0.06, 0.05]:

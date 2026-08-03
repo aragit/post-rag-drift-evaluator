@@ -94,7 +94,9 @@ class StreamingDriftBuffer:
 
         return EmbeddingBatch(vectors=np.vstack(all_vectors))
 
-    def flush_track(self, track: Literal["retrieval", "generation"] = "retrieval") -> EmbeddingBatch:
+    def flush_track(
+        self, track: Literal["retrieval", "generation"] = "retrieval"
+    ) -> EmbeddingBatch:
         """Export the current buffer for a specific track.
 
         Args:
@@ -143,7 +145,9 @@ class StreamingDriftBuffer:
         for buf in self._buffers.values():
             buf.clear()
 
-    def clear_track(self, track: Literal["retrieval", "generation"] = "retrieval") -> None:
+    def clear_track(
+        self, track: Literal["retrieval", "generation"] = "retrieval"
+    ) -> None:
         """Clear a specific track's buffer."""
         if track in self._buffers:
             self._buffers[track].clear()

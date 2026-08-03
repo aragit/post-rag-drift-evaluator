@@ -119,9 +119,7 @@ def _trend_adjusted_estimate(
     mean_v = sum(values) / n
 
     # Compute slope m = sum((t - mean_t)(v - mean_v)) / sum((t - mean_t)^2)
-    numerator = sum(
-        (t - mean_t) * (v - mean_v) for t, v in zip(timestamps, values)
-    )
+    numerator = sum((t - mean_t) * (v - mean_v) for t, v in zip(timestamps, values))
     denominator = sum((t - mean_t) ** 2 for t in timestamps)
 
     if abs(denominator) < 1e-12:

@@ -143,7 +143,11 @@ def test_e2e_counterfactual_then_policy_approval():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="1.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.05, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -154,7 +158,11 @@ def test_e2e_counterfactual_then_policy_approval():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="2.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.45, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.45, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -198,7 +206,11 @@ def test_e2e_cooldown_blocks_identical_action():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="1.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.05, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -208,7 +220,11 @@ def test_e2e_cooldown_blocks_identical_action():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="2.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.45, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.45, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -256,7 +272,11 @@ def test_e2e_telemetry_metrics_updated():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="1.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.05, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -266,7 +286,11 @@ def test_e2e_telemetry_metrics_updated():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="2.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.45, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.45, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -291,12 +315,12 @@ def test_e2e_telemetry_metrics_updated():
 
     # Record telemetry
     telemetry.increment_drift_events(severity="high")
-    telemetry.record_latent_drift_score(
-        score=0.45, track="retrieval", metric="mmd"
-    )
+    telemetry.record_latent_drift_score(score=0.45, track="retrieval", metric="mmd")
     telemetry.increment_optimization_actions(
         status=result.status,
-        rule_violated=result.policy_decision.rule_violated if result.policy_decision else None,
+        rule_violated=result.policy_decision.rule_violated
+        if result.policy_decision
+        else None,
     )
 
     counters = telemetry.get_counters_snapshot()
@@ -305,8 +329,10 @@ def test_e2e_telemetry_metrics_updated():
     assert counters.get("drift_events:high", 0) >= 1
     assert "drift_score:retrieval:mmd" in metrics
     assert metrics["drift_score:retrieval:mmd"] == 0.45
-    assert counters.get(f"optimization_actions:{result.status}:none", 0) >= 1 or \
-           counters.get(f"optimization_actions:{result.status}:cooldown_period", 0) >= 1
+    assert (
+        counters.get(f"optimization_actions:{result.status}:none", 0) >= 1
+        or counters.get(f"optimization_actions:{result.status}:cooldown_period", 0) >= 1
+    )
 
 
 # ── API Endpoint Tests ──────────────────────────────────────────────────
@@ -322,7 +348,11 @@ async def test_e2e_api_eval_endpoint():
             run_id="test_run",
             timestamp=1.0,
             system_version="1.0.0",
-            metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id="test_run")],
+            metrics=[
+                DriftResult(
+                    metric_name="js_divergence", value=0.05, current_run_id="test_run"
+                )
+            ],
         )
         response = await client.post(
             "/v1/eval",
@@ -346,7 +376,9 @@ async def test_e2e_api_drift_detect_endpoint():
     baseline = rng.normal(0, 1, size=(200, 20)).tolist()
     current = rng.normal(2.0, 1, size=(200, 20)).tolist()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         response = await client.post(
             "/v1/drift/detect",
             json={
@@ -385,7 +417,11 @@ async def test_e2e_api_remediate_endpoint():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="1.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.05, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
     for i in range(5, 10):
@@ -394,7 +430,11 @@ async def test_e2e_api_remediate_endpoint():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="2.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.45, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.45, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -409,7 +449,9 @@ async def test_e2e_api_remediate_endpoint():
 
     store_records = [r.to_dict() for r in store.load_all()]
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         response = await client.post(
             "/v1/remediate",
             json={
@@ -483,7 +525,11 @@ def test_e2e_drift_then_fusion_then_remediation():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="1.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.05, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -494,7 +540,11 @@ def test_e2e_drift_then_fusion_then_remediation():
                 run_id=f"r{i}",
                 timestamp=float(i),
                 system_version="2.0.0",
-                metrics=[DriftResult(metric_name="js_divergence", value=0.45, current_run_id=f"r{i}")],
+                metrics=[
+                    DriftResult(
+                        metric_name="js_divergence", value=0.45, current_run_id=f"r{i}"
+                    )
+                ],
             )
         )
 
@@ -555,7 +605,9 @@ async def test_e2e_api_stream_endpoints():
 
     rng = np.random.RandomState(42)
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         # Ingest 100 vectors
         for i in range(100):
             vec = rng.normal(0, 1, size=20).tolist()
@@ -574,4 +626,3 @@ async def test_e2e_api_stream_endpoints():
         data = response.json()
         assert "drift_score" in data
         assert "drift_detected" in data
-

@@ -218,7 +218,9 @@ def test_compute_latent_drift_function(baseline_vectors, shifted_vectors):
     assert result.drift_detected is True
 
 
-def test_detect_latent_drift_events_returns_drift_event(baseline_vectors, shifted_vectors):
+def test_detect_latent_drift_events_returns_drift_event(
+    baseline_vectors, shifted_vectors
+):
     baseline = EmbeddingBatch(vectors=baseline_vectors)
     current = EmbeddingBatch(vectors=shifted_vectors)
     events = detect_latent_drift_events(baseline, current, threshold=0.15, metric="jsd")

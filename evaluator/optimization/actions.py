@@ -41,21 +41,15 @@ def generate_actions(
     """
     actions: list[OptimizationAction] = []
 
-    factors = sorted(
-        attribution.factors, key=lambda f: f.score, reverse=True
-    )
+    factors = sorted(attribution.factors, key=lambda f: f.score, reverse=True)
 
     for factor in factors:
-        action_type = _CHANGE_TYPE_TO_ACTION.get(
-            factor.factor_name, "rollback_config"
-        )
+        action_type = _CHANGE_TYPE_TO_ACTION.get(factor.factor_name, "rollback_config")
         description = _ACTION_DESCRIPTIONS.get(
             action_type, "Rollback configuration change"
         )
         change_id = str(factor.metadata.get("change_id", ""))
-        target_run_id = (
-            factor.related_run_ids[0] if factor.related_run_ids else ""
-        )
+        target_run_id = factor.related_run_ids[0] if factor.related_run_ids else ""
 
         action = OptimizationAction(
             action_type=action_type,

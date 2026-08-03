@@ -54,7 +54,9 @@ class OptimizationResult:
                 "allowed": self.policy_decision.allowed,
                 "reason": self.policy_decision.reason,
                 "rule_violated": self.policy_decision.rule_violated,
-            } if self.policy_decision else None,
+            }
+            if self.policy_decision
+            else None,
             "counterfactual_count": len(self.counterfactual_results),
             "metadata": self.metadata,
         }

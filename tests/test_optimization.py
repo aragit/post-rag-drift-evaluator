@@ -54,9 +54,7 @@ def _make_drift_with_model_change() -> tuple[JSONHistoryStore, DriftEvent]:
 
     for i in range(3):
         store.save(
-            make_drift_record(
-                f"r{i}", timestamp=i, value=0.05, system_version="0.1.0"
-            )
+            make_drift_record(f"r{i}", timestamp=i, value=0.05, system_version="0.1.0")
         )
     store.save(
         make_drift_record("r3", timestamp=3.0, value=0.30, system_version="0.2.0")

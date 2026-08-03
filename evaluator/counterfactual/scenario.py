@@ -38,9 +38,7 @@ def build_counterfactual_scenarios(
     if not attribution.factors:
         return []
 
-    factors = sorted(
-        attribution.factors, key=lambda f: f.score, reverse=True
-    )[:top_k]
+    factors = sorted(attribution.factors, key=lambda f: f.score, reverse=True)[:top_k]
 
     scenarios: list[CounterfactualScenario] = []
 
@@ -82,9 +80,7 @@ def build_counterfactual_scenarios(
         combined = CounterfactualScenario(
             drift_event_id=attribution.drift_event_id,
             interventions=interventions,
-            description=(
-                f"Remove all {len(interventions)} top-ranked changes"
-            ),
+            description=(f"Remove all {len(interventions)} top-ranked changes"),
         )
         scenarios.append(combined)
 

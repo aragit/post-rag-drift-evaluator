@@ -42,9 +42,7 @@ def test_estimate_mean_method():
     store = JSONHistoryStore(os.path.join(tmpdir, "h.jsonl"))
 
     for i in range(3):
-        store.save(
-            make_drift_record(f"r{i}", timestamp=i, value=0.10)
-        )
+        store.save(make_drift_record(f"r{i}", timestamp=i, value=0.10))
 
     drift = DriftEvent(
         metric_name="js_divergence",
@@ -69,9 +67,7 @@ def test_estimate_ewma_method():
 
     # Rising baseline: 0.05, 0.10, 0.15, 0.20
     for i, v in enumerate([0.05, 0.10, 0.15, 0.20]):
-        store.save(
-            make_drift_record(f"r{i}", timestamp=i, value=v)
-        )
+        store.save(make_drift_record(f"r{i}", timestamp=i, value=v))
 
     drift = DriftEvent(
         metric_name="js_divergence",
@@ -99,9 +95,7 @@ def test_estimate_ewma_weight_recency():
     store = JSONHistoryStore(os.path.join(tmpdir, "h.jsonl"))
 
     for i, v in enumerate([0.05, 0.10, 0.15, 0.20]):
-        store.save(
-            make_drift_record(f"r{i}", timestamp=i, value=v)
-        )
+        store.save(make_drift_record(f"r{i}", timestamp=i, value=v))
 
     drift = DriftEvent(
         metric_name="js_divergence",
@@ -127,9 +121,7 @@ def test_estimate_trend_adjusted_uses_extrapolation():
 
     # Linearly increasing values at timestamps 0, 1, 2
     for i, v in enumerate([0.10, 0.15, 0.20]):
-        store.save(
-            make_drift_record(f"r{i}", timestamp=i, value=v)
-        )
+        store.save(make_drift_record(f"r{i}", timestamp=i, value=v))
 
     drift = DriftEvent(
         metric_name="js_divergence",
@@ -181,9 +173,7 @@ def test_estimate_trend_adjusted_more_accurate_than_mean_for_rising_series():
 
     # Linearly increasing: 0.10, 0.20, 0.30, 0.40, 0.50
     for i, v in enumerate([0.10, 0.20, 0.30, 0.40, 0.50]):
-        store.save(
-            make_drift_record(f"r{i}", timestamp=i, value=v)
-        )
+        store.save(make_drift_record(f"r{i}", timestamp=i, value=v))
 
     drift = DriftEvent(
         metric_name="js_divergence",
@@ -265,6 +255,10 @@ def test_estimate_deterministic():
         magnitude=0.5,
     )
 
-    e1 = estimate_metric_after_intervention(drift, store, "js_divergence", method="trend_adjusted")
-    e2 = estimate_metric_after_intervention(drift, store, "js_divergence", method="trend_adjusted")
+    e1 = estimate_metric_after_intervention(
+        drift, store, "js_divergence", method="trend_adjusted"
+    )
+    e2 = estimate_metric_after_intervention(
+        drift, store, "js_divergence", method="trend_adjusted"
+    )
     assert e1 == e2

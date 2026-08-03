@@ -169,7 +169,9 @@ def test_multiple_scenarios_no_disk_writes():
 
     for i in range(100):
         for scenario in attribute_drift(_make_store_with_drift()[1], store).factors:
-            iv = Intervention(action="remove", change_id=scenario.metadata.get("change_id", ""))
+            iv = Intervention(
+                action="remove", change_id=scenario.metadata.get("change_id", "")
+            )
             result = apply_intervention(store, iv)
             assert isinstance(result, InMemoryHistoryStore)
 
@@ -184,6 +186,7 @@ def test_apply_scenario_returns_in_memory():
     attribution = attribute_drift(drift_event, store)
 
     from evaluator.counterfactual.scenario import build_counterfactual_scenarios
+
     scenarios = build_counterfactual_scenarios(attribution, top_k=3)
 
     for scenario in scenarios:
