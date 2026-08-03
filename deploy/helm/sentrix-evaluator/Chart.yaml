@@ -1,0 +1,17 @@
+apiVersion: v2
+name: sentrix-evaluator
+description: A Helm chart for deploying the Sentrix Evaluator — causal evaluation & optimization engine
+type: application
+version: 0.6.1
+appVersion: "0.6.1"
+keywords:
+  - rag
+  - drift-detection
+  - evaluation
+  - optimization
+  - aiops
+home: https://github.com/aragit/post-rag-drift-evaluator
+sources:
+  - https://github.com/aragit/post-rag-drift-evaluator
+maintainers:
+  - name: Sentrix Maintainers

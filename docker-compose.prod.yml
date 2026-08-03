@@ -1,0 +1,102 @@
+name: sentrix-evaluator
+version: 0.6.1
+description: Production deployment for Sentrix Evaluator — causal evaluation & optimization engine
+
+services:
+  sentrix-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sentrix-evaluator:v0.6.1
+    container_name: sentrix-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-drift_db}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-drift_db}
+      REDIS_URL: redis://redis:6379/0
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-mock-key-1234}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/eval')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    volumes:
+      - sentrix-data:/app/data
+    networks:
+      - sentrix-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentrix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-drift_db}
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-drift_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - sentrix-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentrix-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - redis-data:/data
+    networks:
+      - sentrix-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sentrix-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - sentrix-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  sentrix-data:
+
+networks:
+  sentrix-network:
+    driver: bridge

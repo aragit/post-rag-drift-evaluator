@@ -1,0 +1,88 @@
+# Default values for sentrix-evaluator
+replicaCount: 2
+
+image:
+  repository: sentrix-evaluator
+  tag: v0.6.1
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: sentrix-evaluator.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+env:
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: postgres
+  POSTGRES_DB: drift_db
+  REDIS_URL: redis://redis:6379/0
+  LITELLM_MASTER_KEY: sk-mock-key-1234
+
+envFrom: []
+# Example:
+# envFrom:
+#   - secretRef:
+#       name: sentrix-evaluator-secrets
+
+secretRef: ""
+# If set, mount an existing secret with all env vars:
+# secretRef: sentrix-evaluator-secret
+
+resources:
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+persistence:
+  enabled: false
+  size: 1Gi
+  storageClass: ""
+
+extraVolumeMounts: []
+extraVolumes: []
+
+livenessProbe:
+  enabled: true
+  path: /v1/eval
+  port: 8000
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+readinessProbe:
+  enabled: true
+  path: /v1/eval
+  port: 8000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3

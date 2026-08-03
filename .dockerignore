@@ -1,11 +1,62 @@
-.venv/
-venv/
-__pycache__/
-*.pyc
-.git/
-.github/
+.git
+.gitignore
+.github
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build
+develop-eggs
+dist
+downloads
+eggs
+.eggs
+lib
+lib64
+parts
+sdist
+var
+wheels
+*.egg-info
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Testing
+.coverage
+.coverage.*
+htmlcov
+.tox
+.nox
+.coverage
+*.cover
+.pytest_cache
+.mypy_cache
+
+# IDE
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Docker
+Dockerfile
+*.dockerfile
+docker-compose*.yml
+
+# Documentation
+*.md
+docs/
+*.rst
+
+# Other
+.env
 .mypy_cache/
 .ruff_cache/
-.pytest_cache/
-.env
-
