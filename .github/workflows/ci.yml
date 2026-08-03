@@ -80,6 +80,29 @@ jobs:
       - name: Run Mypy Static Type Check
         run: mypy --ignore-missing-imports evaluator/ api/
 
+      - name: Initialize Database Schema
+        run: |
+          python -m alembic upgrade head
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5433
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: drift_db
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/drift_db
+
+      - name: Seed Database with Sample Data
+        run: |
+          python scripts/seed_db.py --force-reset
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5433
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: drift_db
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/drift_db
+          LITELLM_MASTER_KEY: sk-mock-key-1234
+
       - name: Execute Test Suite
         env:
           POSTGRES_HOST: localhost
