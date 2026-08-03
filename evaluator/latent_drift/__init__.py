@@ -1,3 +1,4 @@
+from evaluator.latent_drift.distance import compute_mmd, compute_swd
 from evaluator.latent_drift.engine import (
     LatentDriftEngine,
     compute_latent_drift,
@@ -13,6 +14,8 @@ __all__ = [
     "compute_latent_drift",
     "detect_latent_drift_events",
     "compute_jsd",
+    "compute_mmd",
+    "compute_swd",
     "fit_kde",
     "evaluate_density",
     "fit_pca",

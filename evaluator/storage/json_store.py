@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from typing import Any
 
 from evaluator.storage.models import EvaluationRecord
 
@@ -108,3 +109,14 @@ class JSONHistoryStore:
             if lines:
                 f.write("\n".join(lines) + "\n")
         return clone_store
+
+    def to_in_memory(self) -> Any:
+        """Snapshot all records into an :class:`InMemoryHistoryStore`.
+
+        This is used by the counterfactual simulator to work entirely
+        in memory during scenario evaluation, avoiding repeated disk
+        I/O.
+        """
+        from evaluator.storage.in_memory_store import InMemoryHistoryStore
+
+        return InMemoryHistoryStore(records=self.load_all())

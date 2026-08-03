@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from evaluator.counterfactual.estimator import estimate_metric_after_intervention
 from evaluator.counterfactual.models import (
@@ -13,37 +12,56 @@ from evaluator.counterfactual.scenario import build_counterfactual_scenarios
 
 if TYPE_CHECKING:
     from evaluator.causal.models import CausalAttribution
-    from evaluator.storage import JSONHistoryStore
+    from evaluator.storage import InMemoryHistoryStore, JSONHistoryStore
     from evaluator.temporal.models import DriftEvent
+
+StoreType = Union["JSONHistoryStore", "InMemoryHistoryStore"]
+
+
+def _to_in_memory(store: StoreType) -> InMemoryHistoryStore:
+    """Convert a store to InMemoryHistoryStore if it isn't one already."""
+    from evaluator.storage.in_memory_store import InMemoryHistoryStore
+
+    if isinstance(store, InMemoryHistoryStore):
+        return store
+    if hasattr(store, "to_in_memory"):
+        return store.to_in_memory()
+    # Fallback: wrap whatever load_all() returns
+    return InMemoryHistoryStore(records=store.load_all())
 
 
 def apply_intervention(
-    store: JSONHistoryStore,
+    store: StoreType,
     intervention: Intervention,
-) -> JSONHistoryStore:
-    """Apply a single intervention to a store and return a modified clone.
+) -> InMemoryHistoryStore:
+    """Apply a single intervention to a store and return a modified in-memory clone.
 
-    The original store is **never mutated**.  A new :class:`JSONHistoryStore`
-    is created at a temporary path with the intervention applied.
+    The original store is **never mutated**.  A new
+    :class:`InMemoryHistoryStore` is created with the intervention applied
+    entirely in memory — no disk I/O occurs during simulation.
 
-    For ``action="remove"``: the change identified by ``intervention.change_id``
-    is reverted — the affected record's ``system_version``, ``system_info``,
-    and ``metadata`` fields are restored to their pre-change values, using
-    the diff details stored in the :class:`ChangeEvent`.
+    For ``action="remove"``: the change identified by
+    ``intervention.change_id`` is reverted — the affected record's
+    ``system_version``, ``system_info``, and ``metadata`` fields are
+    restored to their pre-change values, using the diff details stored in
+    the :class:`ChangeEvent`.
 
     For ``action="modify"``: specific metadata fields listed in
     ``intervention.override_metadata`` are set on the affected record.
 
     Args:
-        store: The original (read-only) history store.
+        store: The original (read-only) history store — either
+            :class:`JSONHistoryStore` or :class:`InMemoryHistoryStore`.
         intervention: The intervention to apply.
 
     Returns:
-        A new :class:`JSONHistoryStore` with the intervention applied.
+        A new :class:`InMemoryHistoryStore` with the intervention applied.
     """
     from evaluator.causal.change_extractor import extract_change_events
 
-    cloned = store.clone()
+    # Convert to in-memory for all subsequent operations
+    in_mem = _to_in_memory(store)
+    cloned = in_mem.clone()
     records = sorted(cloned.load_all(), key=lambda r: r.timestamp or 0.0)
 
     if not records:
@@ -68,7 +86,7 @@ def apply_intervention(
                 _apply_modify(record, intervention.override_metadata)
             break
 
-    _write_records(cloned, records)
+    cloned._records = records
     return cloned
 
 
@@ -92,27 +110,20 @@ def _revert_change(record, details: dict) -> None:
 
 
 def _apply_modify(record, override: dict) -> None:
-    """Apply an 'modify' intervention by overriding metadata fields."""
+    """Apply a modify intervention by overriding metadata fields."""
     for key, value in override.items():
         record.metadata[key] = value
 
 
-def _write_records(store: JSONHistoryStore, records: list) -> None:
-    """Overwrite the store's file with a batch of records (deterministic order)."""
-    lines = [json.dumps(r.to_dict()) for r in records]
-    with open(store._path, "w") as f:
-        if lines:
-            f.write("\n".join(lines) + "\n")
-
-
 def apply_scenario(
-    store: JSONHistoryStore,
+    store: StoreType,
     scenario: CounterfactualScenario,
-) -> JSONHistoryStore:
-    """Apply all interventions in a scenario, returning the final clone.
+) -> InMemoryHistoryStore:
+    """Apply all interventions in a scenario, returning the final in-memory clone.
 
     Interventions are applied sequentially: each intervention operates on
-    the result of the previous one.
+    the result of the previous one.  All operations are performed
+    entirely in memory — no disk writes occur during simulation.
     """
     current_store = store
     for intervention in scenario.interventions:
@@ -123,7 +134,7 @@ def apply_scenario(
 def run_counterfactual_analysis(
     drift_event: DriftEvent,
     attribution: CausalAttribution,
-    store: JSONHistoryStore,
+    store: StoreType,
     metric_name: str | None = None,
     top_k: int = 3,
 ) -> list[CounterfactualResult]:
@@ -131,7 +142,8 @@ def run_counterfactual_analysis(
 
     End-to-end pipeline:
     1. Build counterfactual scenarios from the causal attribution.
-    2. For each scenario, apply the interventions to a cloned store.
+    2. For each scenario, apply the interventions to a cloned store
+       (in-memory only — no disk I/O).
     3. Estimate the counterfactual metric value after intervention.
     4. Compute the delta and confidence.
 
@@ -140,7 +152,6 @@ def run_counterfactual_analysis(
         attribution: The causal attribution result for this drift event.
         store: The original (read-only) history store.
         metric_name: Optional override for the metric to estimate.
-            Defaults to ``attribution.metric_name``.
         top_k: Maximum number of individual-factor scenarios to generate.
 
     Returns:
@@ -150,7 +161,6 @@ def run_counterfactual_analysis(
         metric_name = attribution.metric_name
 
     scenarios = build_counterfactual_scenarios(attribution, top_k=top_k)
-
     original_metric = drift_event.magnitude
 
     results: list[CounterfactualResult] = []
@@ -171,10 +181,7 @@ def run_counterfactual_analysis(
                 i.metadata.get("factor_score", 0.0)
                 for i in scenario.interventions
             ]
-            if scores:
-                cf = min(scores)
-            else:
-                cf = 0.0
+            cf = min(scores) if scores else 0.0
 
         result = CounterfactualResult(
             scenario_id=scenario.scenario_id,

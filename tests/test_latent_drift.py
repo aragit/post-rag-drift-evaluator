@@ -17,7 +17,6 @@ from evaluator.latent_drift import (
 )
 from evaluator.temporal.models import DriftEvent
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
 
@@ -199,7 +198,7 @@ def test_engine_compute_drift_requires_fit(baseline_vectors, shifted_vectors):
 
 
 def test_engine_to_drift_event(baseline_vectors, shifted_vectors):
-    engine = LatentDriftEngine(threshold=0.15)
+    engine = LatentDriftEngine(threshold=0.15, metric="jsd")
     result = engine.fit_compute(baseline_vectors, shifted_vectors)
     event = engine.to_drift_event(result)
 
@@ -222,7 +221,7 @@ def test_compute_latent_drift_function(baseline_vectors, shifted_vectors):
 def test_detect_latent_drift_events_returns_drift_event(baseline_vectors, shifted_vectors):
     baseline = EmbeddingBatch(vectors=baseline_vectors)
     current = EmbeddingBatch(vectors=shifted_vectors)
-    events = detect_latent_drift_events(baseline, current, threshold=0.15)
+    events = detect_latent_drift_events(baseline, current, threshold=0.15, metric="jsd")
     assert len(events) == 1
     assert isinstance(events[0], DriftEvent)
     assert events[0].metric_name == "latent_jsd"
@@ -237,12 +236,12 @@ def test_detect_latent_drift_events_no_drift(baseline_vectors, current_vectors):
 
 
 def test_detect_latent_drift_events_with_timestamp(baseline_vectors, shifted_vectors):
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     baseline = EmbeddingBatch(vectors=baseline_vectors)
     current = EmbeddingBatch(
         vectors=shifted_vectors,
-        timestamp=datetime(2026, 1, 15, 12, 0, 0),
+        timestamp=datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
     )
     events = detect_latent_drift_events(baseline, current, threshold=0.15)
     assert len(events) == 1
