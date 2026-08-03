@@ -180,9 +180,11 @@ def create_production_app(
     @application.post("/v1/drift/detect", response_model=DriftDetectResponse)
     async def detect_drift(request: DriftDetectRequest):
         """Detect dual-track latent drift between baseline and current embeddings."""
-        track: Literal["retrieval", "generation", "unified"] = (
-            request.track if request.track in ("retrieval", "generation") else "unified"
-        )
+        track: Literal["retrieval", "generation", "unified"]
+        if request.track in ("retrieval", "generation"):
+            track = request.track
+        else:
+            track = "unified"
         baseline = EmbeddingBatch(
             vectors=np_array(request.baseline_vectors),
             track=track,
