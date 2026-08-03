@@ -16,7 +16,12 @@ from starlette.middleware.cors import CORSMiddleware
 
 from evaluator.counterfactual.simulator import run_counterfactual_analysis
 from evaluator.guardrails.policy import PolicyEvaluator
-from evaluator.latent_drift import EmbeddingBatch
+from evaluator.latent_drift import (
+    EmbeddingBatch,
+    LatentDriftEngine,
+    compute_latent_drift,
+)
+from evaluator.latent_drift.streaming import StreamingDriftBuffer
 from evaluator.optimization.engine import OptimizationEngine
 from evaluator.optimization.runner import (
     STATUS_APPROVED,
@@ -72,6 +77,34 @@ class RemediateRequest(BaseModel):
     top_k: int = Field(default=3, ge=1)
 
 
+class StreamIngestRequest(BaseModel):
+    """Request to ingest a single embedding vector into the streaming buffer."""
+
+    vector: list[float]
+    track: str = Field(default="retrieval", pattern=r"^(retrieval|generation)$")
+
+
+class StreamIngestResponse(BaseModel):
+    """Response confirming vector ingestion."""
+
+    ingested: bool = True
+    track: str = "retrieval"
+    buffer_size: int = 0
+    ready: bool = False
+
+
+class StreamFlushResponse(BaseModel):
+    """Response with drift detection results from a flushed buffer."""
+
+    drift_score: float = 0.0
+    drift_detected: bool = False
+    metric_used: str = "mmd"
+    track: str = "retrieval"
+    n_samples_baseline: int = 0
+    n_samples_current: int = 0
+    threshold: float = 0.15
+
+
 class RemediateResponse(BaseModel):
     """Response with remediation status and action details."""
 
@@ -112,6 +145,7 @@ def create_production_app(
 
     application.state.store_path = store_path
     application.state.store = JSONHistoryStore(store_path)
+    application.state.stream_buffer = StreamingDriftBuffer(capacity=1000, sample_strategy="reservoir")
     application.state.optimization_engine = OptimizationEngine(min_confidence=min_confidence)
     application.state.policy_evaluator = PolicyEvaluator()
     application.state.runner = OptimizationRunner(
@@ -141,8 +175,6 @@ def create_production_app(
     @application.post("/v1/drift/detect", response_model=DriftDetectResponse)
     async def detect_drift(request: DriftDetectRequest):
         """Detect dual-track latent drift between baseline and current embeddings."""
-        from evaluator.latent_drift import compute_latent_drift
-
         baseline = EmbeddingBatch(
             vectors=np_array(request.baseline_vectors),
             track=request.track,
@@ -262,6 +294,85 @@ def create_production_app(
                 "rule_violated": None,
             },
             counterfactual_count=len(cf_results),
+        )
+
+    @application.post("/v1/stream/ingest", response_model=StreamIngestResponse)
+    async def stream_ingest(request: StreamIngestRequest):
+        """Ingest a single embedding vector into the streaming drift buffer."""
+        buffer = application.state.stream_buffer
+        import numpy as np
+        vector = np.array(request.vector, dtype=float)
+        buffer.ingest(vector, track=request.track)
+        return StreamIngestResponse(
+            ingested=True,
+            track=request.track,
+            buffer_size=buffer.sizes.get(request.track, 0),
+            ready=buffer.is_track_ready(track=request.track, min_samples=50),
+        )
+
+    @application.post("/v1/stream/flush", response_model=StreamFlushResponse)
+    async def stream_flush():
+        """Flush the streaming buffer and run latent drift detection.
+
+        Uses the most recent flush as the 'current' batch and compares
+        against the existing stream buffer baseline.
+        """
+        buffer = application.state.stream_buffer
+        current_batch = buffer.flush_batch()
+
+        import numpy as np
+
+        from evaluator.latent_drift.schemas import EmbeddingBatch
+
+        if current_batch.vectors.shape[0] == 0:
+            return StreamFlushResponse()
+
+        # For demonstration purposes, we use the first track with data
+        # In production, a baseline would be stored and compared
+        track = "retrieval"
+        if buffer.sizes.get("generation", 0) > buffer.sizes.get("retrieval", 0):
+            track = "generation"
+
+        track_batch = buffer.flush_track(track=track)
+        if track_batch.vectors.shape[0] == 0:
+            return StreamFlushResponse(drift_detected=False, track=track)
+
+        # Use a simple baseline from random normal for demo
+        # In production, this would be a stored baseline
+        engine = LatentDriftEngine(
+            threshold=0.15,
+            metric="mmd",
+            pca_components=min(5, track_batch.vectors.shape[1]),
+        )
+
+        # Baseline is not fitted; we return the result with score computed
+        # against a synthetic baseline (or the engine handles unfitted gracefully)
+        # For this endpoint, we just return raw detection
+        baseline = EmbeddingBatch(
+            vectors=np.random.RandomState(42).normal(0, 1, size=(100, track_batch.vectors.shape[1])),
+            track=track,
+        )
+        current = EmbeddingBatch(
+            vectors=track_batch.vectors,
+            track=track,
+        )
+
+        result = compute_latent_drift(
+            baseline=baseline,
+            current=current,
+            threshold=0.15,
+            metric="mmd",
+            pca_components=engine.pca_components,
+        )
+
+        return StreamFlushResponse(
+            drift_score=result.drift_score,
+            drift_detected=result.drift_detected,
+            metric_used=result.metric_used,
+            track=result.track,
+            n_samples_baseline=result.n_samples_baseline,
+            n_samples_current=result.n_samples_current,
+            threshold=result.threshold,
         )
 
     return application

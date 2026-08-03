@@ -21,12 +21,15 @@ from httpx import ASGITransport, AsyncClient
 
 from evaluator.api.app import create_production_app
 from evaluator.causal.attribution import attribute_drift
+from evaluator.causal.fusion import CausalLatentFusionEngine
 from evaluator.guardrails.policy import PolicyEvaluator
 from evaluator.latent_drift import (
     EmbeddingBatch,
     LatentDriftEngine,
+    StreamingDriftBuffer,
     compute_latent_drift,
 )
+from evaluator.latent_drift.schemas import LatentDriftResult
 from evaluator.metrics.results import DriftResult
 from evaluator.optimization.engine import OptimizationEngine
 from evaluator.optimization.runner import (
@@ -419,3 +422,156 @@ async def test_e2e_api_remediate_endpoint():
         assert response.status_code == 200
         data = response.json()
         assert data["counterfactual_count"] >= 0
+
+
+# ── Phase 5.1: Streaming Buffer → Dual-Track Drift → Causal Fusion ─────────
+
+
+def test_e2e_streaming_to_dual_track_drift():
+    """Stream 100 vectors → flush → run dual-track drift detection."""
+    rng = np.random.RandomState(42)
+    buffer = StreamingDriftBuffer(capacity=1000, sample_strategy="reservoir")
+
+    # Stream 100 retrieval vectors (stable)
+    for i in range(100):
+        vec = rng.normal(0, 1, size=20)
+        buffer.ingest(vec, track="retrieval")
+
+    # Stream 50 generation vectors (stable)
+    for i in range(50):
+        vec = rng.normal(0, 1, size=20)
+        buffer.ingest(vec, track="generation")
+
+    assert buffer.sizes["retrieval"] == 100
+    assert buffer.sizes["generation"] == 50
+    assert buffer.is_ready(min_samples=50) is True
+    assert buffer.is_track_ready(track="retrieval", min_samples=50) is True
+    assert buffer.is_track_ready(track="generation", min_samples=50) is True
+
+    # Flush and verify EmbeddingBatch
+    batch = buffer.flush_batch()
+    assert batch.vectors.shape == (150, 20)
+
+    # Flush individual tracks
+    ret_batch = buffer.flush_track(track="retrieval")
+    assert ret_batch.vectors.shape == (100, 20)
+
+
+def test_e2e_streaming_reservoir_capacity():
+    """Streaming buffer with reservoir sampling enforces per-track capacity."""
+    rng = np.random.RandomState(42)
+    buffer = StreamingDriftBuffer(capacity=100, sample_strategy="reservoir")
+
+    # Ingest more than capacity
+    for i in range(200):
+        vec = rng.normal(0, 1, size=20)
+        buffer.ingest(vec, track="retrieval")
+
+    # Per-track capacity = 100 // 2 = 50
+    assert buffer.sizes["retrieval"] == 50
+
+
+def test_e2e_drift_then_fusion_then_remediation():
+    """Full pipeline: drift → causal-latent fusion → guarded remediation."""
+    tmpdir = tempfile.mkdtemp()
+    store = JSONHistoryStore(os.path.join(tmpdir, "history.jsonl"))
+
+    # Populate stable baseline records
+    for i in range(5):
+        store.save(
+            EvaluationRecord(
+                run_id=f"r{i}",
+                timestamp=float(i),
+                system_version="1.0.0",
+                metrics=[DriftResult(metric_name="js_divergence", value=0.05, current_run_id=f"r{i}")],
+            )
+        )
+
+    # Drifted records with version change
+    for i in range(5, 10):
+        store.save(
+            EvaluationRecord(
+                run_id=f"r{i}",
+                timestamp=float(i),
+                system_version="2.0.0",
+                metrics=[DriftResult(metric_name="js_divergence", value=0.45, current_run_id=f"r{i}")],
+            )
+        )
+
+    drift_event = DriftEvent(
+        metric_name="js_divergence",
+        start_timestamp=5.0,
+        end_timestamp=9.0,
+        magnitude=0.45,
+        metadata={"track": "retrieval"},
+    )
+
+    attribution = attribute_drift(drift_event, store)
+
+    # Create a default causal graph
+    fusion_engine = CausalLatentFusionEngine()
+    causal_graph = fusion_engine._default_graph()
+
+    # Create a latent drift result
+    latent_result = LatentDriftResult(
+        drift_score=0.45,
+        drift_detected=True,
+        threshold=0.15,
+        n_samples_baseline=500,
+        n_samples_current=500,
+        metric_used="mmd",
+        track="retrieval",
+    )
+
+    # Run optimization cycle with fusion
+    runner = OptimizationRunner(
+        engine=OptimizationEngine(min_confidence=0.0),
+        policy_evaluator=PolicyEvaluator(cooldown_period_s=0),
+        fusion_engine=fusion_engine,
+    )
+
+    in_memory = store.to_in_memory()
+    result = runner.run_optimization_cycle(
+        drift_event=drift_event,
+        attribution=attribution,
+        store=in_memory,
+        causal_graph=causal_graph,
+        latent_drift_result=latent_result,
+    )
+
+    assert isinstance(result, OptimizationResult)
+    assert result.status == STATUS_APPROVED
+    assert result.action is not None
+    assert result.action.action_type == "adjust_top_k"
+    assert result.metadata.get("fusion_applied") is True
+
+
+@pytest.mark.asyncio
+async def test_e2e_api_stream_endpoints():
+    """POST /v1/stream/ingest and /v1/stream/flush work."""
+    from evaluator.api.app import create_production_app
+
+    app = create_production_app()
+
+    rng = np.random.RandomState(42)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Ingest 100 vectors
+        for i in range(100):
+            vec = rng.normal(0, 1, size=20).tolist()
+            response = await client.post(
+                "/v1/stream/ingest",
+                json={"vector": vec, "track": "retrieval"},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["ingested"] is True
+            assert data["track"] == "retrieval"
+
+        # Flush
+        response = await client.post("/v1/stream/flush")
+        assert response.status_code == 200
+        data = response.json()
+        assert "drift_score" in data
+        assert "drift_detected" in data
+

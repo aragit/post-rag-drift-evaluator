@@ -4,20 +4,31 @@ Usage:
     sentrix eval --store history.jsonl --input records.json
     sentrix drift --store history.jsonl --metric js_divergence --threshold 0.15
     sentrix remediate --store history.jsonl --metric js_divergence --threshold 0.15
+    sentrix stream --track retrieval --capacity 500 < vectors.jsonl
 
 Commands:
     eval       Ingest evaluation records from JSON file into the history store.
     drift      Detect drift events from the history store.
     remediate  Run full optimization pipeline: drift → attribution → CF → optimization.
+    stream     Ingest embedding vectors from stdin/file into a streaming buffer
+               and optionally flush for drift detection.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
+
+import numpy as np
 
 from evaluator.causal.attribution import attribute_drift
 from evaluator.counterfactual.simulator import run_counterfactual_analysis
+from evaluator.latent_drift import (
+    EmbeddingBatch,
+    StreamingDriftBuffer,
+    compute_latent_drift,
+)
 from evaluator.optimization.optimizer import generate_optimization_plan
 from evaluator.storage import JSONHistoryStore
 from evaluator.temporal.drift_detection import detect_drift_from_store
@@ -120,6 +131,70 @@ def cmd_remediate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_stream(args: argparse.Namespace) -> int:
+    """Ingest embedding vectors from stdin/file into a streaming buffer and optionally flush."""
+    buffer = StreamingDriftBuffer(
+        capacity=args.capacity,
+        sample_strategy=args.strategy,
+    )
+
+    lines_read = 0
+    if args.input and args.input != "-":
+        with open(args.input) as f:
+            lines = f.readlines()
+    else:
+        lines = sys.stdin.readlines()
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        data = json.loads(line)
+        vector = data.get("vector", data)
+        track = data.get("track", args.track)
+        buffer.ingest(np.array(vector, dtype=float), track=track)
+        lines_read += 1
+
+    print(f"Ingested {lines_read} vector(s) into streaming buffer (capacity={args.capacity})")
+    print(f"Buffer sizes: {buffer.sizes}")
+
+    if args.flush:
+        current_batch = buffer.flush_batch()
+        print(f"Flushed {current_batch.vectors.shape[0]} vector(s)")
+
+        if current_batch.vectors.shape[0] == 0:
+            print("Buffer empty, nothing to flush.")
+            return 0
+
+        track = args.track
+        track_batch = buffer.flush_track(track=track)
+        if track_batch.vectors.shape[0] == 0:
+            print(f"No data for track '{track}'")
+            return 0
+
+        baseline = EmbeddingBatch(
+            vectors=np.random.RandomState(42).normal(0, 1, size=(100, track_batch.vectors.shape[1])),
+            track=track,
+        )
+        current = EmbeddingBatch(
+            vectors=track_batch.vectors,
+            track=track,
+        )
+
+        result = compute_latent_drift(
+            baseline=baseline,
+            current=current,
+            threshold=args.threshold,
+            metric=args.metric,
+            pca_components=min(5, track_batch.vectors.shape[1]),
+        )
+        print(f"Drift score: {result.drift_score:.4f} (threshold={result.threshold:.4f})")
+        print(f"Drift detected: {result.drift_detected}")
+        print(f"Metric: {result.metric_used}, Track: {result.track}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="sentrix",
@@ -153,6 +228,31 @@ def main(argv: list[str] | None = None) -> int:
     remediate_parser.add_argument("--threshold", type=float, default=0.15, help="Threshold")
     remediate_parser.add_argument("--top-k", type=int, default=3, help="Top K factors")
     remediate_parser.set_defaults(func=cmd_remediate)
+
+    # stream command
+    stream_parser = subparsers.add_parser("stream", help="Ingest streaming embedding vectors")
+    stream_parser.add_argument(
+        "--capacity", type=int, default=1000, help="Buffer capacity"
+    )
+    stream_parser.add_argument(
+        "--strategy", choices=["reservoir", "fifo"], default="reservoir", help="Buffer overflow strategy"
+    )
+    stream_parser.add_argument(
+        "--track", default="retrieval", choices=["retrieval", "generation"], help="Embedding track"
+    )
+    stream_parser.add_argument(
+        "--metric", default="mmd", help="Drift metric (mmd, swd, jsd)"
+    )
+    stream_parser.add_argument(
+        "--threshold", type=float, default=0.15, help="Drift threshold"
+    )
+    stream_parser.add_argument(
+        "--flush", action="store_true", help="Flush after ingestion and run drift detection"
+    )
+    stream_parser.add_argument(
+        "--input", default="-", help="Path to JSONL file (default: stdin, use '-' for stdin)"
+    )
+    stream_parser.set_defaults(func=cmd_stream)
 
     args = parser.parse_args(argv)
 
