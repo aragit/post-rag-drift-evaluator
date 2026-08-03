@@ -82,7 +82,7 @@ jobs:
 
       - name: Initialize Database Schema
         run: |
-          python -m alembic upgrade head
+          alembic upgrade head
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5433
