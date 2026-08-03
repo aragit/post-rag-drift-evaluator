@@ -51,11 +51,19 @@ extend-exclude = [
     ".git",
     "__pycache__",
     ".agents",
+    "core_source_code.md",
+    "*.md",
 ]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "DTZ"]
 ignore = ["E501"]
+
+[tool.ruff.format]
+exclude = [
+    "core_source_code.md",
+    "*.md",
+]
 
 [tool.mypy]
 python_version = "3.9"
