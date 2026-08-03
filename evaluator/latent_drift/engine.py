@@ -225,7 +225,9 @@ class LatentDriftEngine:
 
         self.fit(baseline_vectors)
 
-        base_proj = np.atleast_2d(self._baseline_proj)
+        base_proj = np.atleast_2d(
+            self._baseline_proj if self._baseline_proj is not None else np.empty((0, 0))
+        )
         n_base_retrieval = np.atleast_2d(baseline_retrieval).shape[0]
         n_base_generation = np.atleast_2d(baseline_generation).shape[0]
         base_ret_proj = base_proj[:n_base_retrieval]

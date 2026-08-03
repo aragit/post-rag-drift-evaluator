@@ -43,11 +43,11 @@ def score_actions(
     recommendations: list[OptimizationRecommendation] = []
 
     for priority, action in enumerate(actions, start=1):
-        cf = cf_by_change.get(action.change_id)
-        if cf is not None:
-            expected_improvement = cf.delta
-            confidence = cf.confidence
-            cf_metadata = cf.metadata
+        cf_match = cf_by_change.get(action.change_id)
+        if cf_match is not None:
+            expected_improvement = cf_match.delta
+            confidence = cf_match.confidence
+            cf_metadata = cf_match.metadata
         else:
             expected_improvement = 0.0
             confidence = 0.0

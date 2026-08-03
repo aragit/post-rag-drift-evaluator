@@ -56,11 +56,11 @@ class RAGResponse(BaseModel):
         system_info = None
         if "pipeline_name" in self.metadata:
             system_info = RAGSystemInfo(
-                name=self.metadata.get("pipeline_name"),
-                model=self.metadata.get("model"),
-                embedding_model=self.metadata.get("embedding_model"),
-                retriever=self.metadata.get("retriever"),
-                version=self.metadata.get("version"),
+                name=self.metadata.get("pipeline_name") or "",
+                model=self.metadata.get("model") or "",
+                embedding_model=self.metadata.get("embedding_model") or "default",
+                retriever=self.metadata.get("retriever") or "default",
+                version=self.metadata.get("version") or "0.0.0",
             )
 
         return RAGRun(

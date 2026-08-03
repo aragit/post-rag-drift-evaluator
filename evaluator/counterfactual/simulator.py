@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING, Union
 
 from evaluator.counterfactual.estimator import estimate_metric_after_intervention
@@ -125,7 +126,7 @@ def apply_scenario(
     the result of the previous one.  All operations are performed
     entirely in memory — no disk writes occur during simulation.
     """
-    current_store = store
+    current_store = _to_in_memory(store)
     for intervention in scenario.interventions:
         current_store = apply_intervention(current_store, intervention)
     return current_store
@@ -183,7 +184,7 @@ def run_counterfactual_analysis(
             cf = min(scores) if scores else 0.0
 
         result = CounterfactualResult(
-            scenario_id=scenario.scenario_id,
+            scenario_id=scenario.scenario_id or str(uuid.uuid4()),
             original_metric=round(original_metric, 6),
             counterfactual_metric=round(cf_metric, 6),
             delta=round(delta, 6),

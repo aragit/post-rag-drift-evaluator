@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from evaluator.metrics.drift import evaluate_drift
 from evaluator.metrics.quality import evaluate_all_from_run
-from evaluator.metrics.results import DriftResult, QualityResult
+from evaluator.metrics.results import DriftResult, MetricResult, QualityResult
 
 if TYPE_CHECKING:
     from evaluator.storage import JSONHistoryStore
@@ -52,7 +52,7 @@ class RAGEvaluator:
         drift_result = evaluate_drift(baseline_run, current_run)
         quality_results = evaluate_all_from_run(current_run)
 
-        all_results = [drift_result, *quality_results.values()]
+        all_results: list[MetricResult] = [drift_result, *quality_results.values()]
         self._persist_if_needed(baseline_run, current_run, all_results)
 
         return {
@@ -64,7 +64,7 @@ class RAGEvaluator:
         self,
         baseline_run: RAGRun,
         current_run: RAGRun,
-        metrics: list[DriftResult | QualityResult],
+        metrics: list[MetricResult],
     ) -> None:
         """Store an EvaluationRecord if a history store is configured."""
         if self.history_store is None:
@@ -72,7 +72,7 @@ class RAGEvaluator:
         from evaluator.storage import EvaluationRecord
 
         record = EvaluationRecord(
-            run_id=current_run.run_id,
+            run_id=current_run.run_id or "",
             metrics=metrics,
             metadata={
                 "baseline_run_id": baseline_run.run_id,

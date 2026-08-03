@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from typing import Any
+from typing import Literal
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -180,13 +181,16 @@ def create_production_app(
     @application.post("/v1/drift/detect", response_model=DriftDetectResponse)
     async def detect_drift(request: DriftDetectRequest):
         """Detect dual-track latent drift between baseline and current embeddings."""
+        track: Literal["retrieval", "generation", "unified"] = (
+            request.track if request.track in ("retrieval", "generation") else "unified"
+        )
         baseline = EmbeddingBatch(
             vectors=np_array(request.baseline_vectors),
-            track=request.track,
+            track=track,
         )
         current = EmbeddingBatch(
             vectors=np_array(request.current_vectors),
-            track=request.track,
+            track=track,
         )
 
         from evaluator.config import config

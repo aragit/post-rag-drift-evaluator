@@ -84,9 +84,9 @@ class SentrixMetricsExporter:
             return _NoopMeter()
 
         try:
-            import importlib.util as _ilu
+            from importlib import util
 
-            if not _ilu.util.find_spec("opentelemetry"):
+            if not util.find_spec("opentelemetry"):
                 return _NoopMeter()
             from opentelemetry import metrics
             from opentelemetry.sdk.metrics import MeterProvider
