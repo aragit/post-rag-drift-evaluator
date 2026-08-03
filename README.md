@@ -1,52 +1,96 @@
 # Sentrix Evaluator
 
-**Causal Evaluation & Autonomous Optimization Engine for AI Systems**
+### Causal Evaluation & Autonomous Optimization Engine for AI Systems
 
----
+**Sentrix Evaluator** is a distribution-aware evaluation framework that detects latent-space drift, explains its root causes, simulates counterfactual alternatives, and recommends concrete remediation actions — transforming evaluation from passive monitoring into active decision-making.
 
-## Badges
-
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Production](https://img.shields.io/badge/status-stable-brightgreen)](https://github.com/aragit/post-rag-drift-evaluator)
-
----
-
-## Introduction
-
-Sentrix Evaluator detects drift, explains its root causes, simulates counterfactual alternatives, and recommends concrete actions to fix problems — all from a single evaluation history store.
-
-Built for AI teams that need to move beyond passive monitoring to **reasoning about why drift occurred** and **what to do about it**.
-
-**Measure → Track → Detect → Explain → Simulate → Act**
+It treats AI systems as **dynamic statistical processes**, enabling early detection of systemic failure modes before they manifest in degraded outputs.
 
 ---
 
 ## Why Sentrix Evaluator?
 
-Traditional monitoring tools report *that* something changed:
+Modern AI systems operate under an assumption:
 
-| Traditional Tools | Sentrix Evaluator |
-|---|---|
-| Metrics dashboards | Causal attribution |
-| Threshold alerts | Root-cause ranking |
-| Manual investigation | Counterfactual simulation |
-| Reactive response | Autonomous recommendations |
+> The distribution of incoming data matches the distribution of baseline/reference data.
 
-Sentrix doesn't just tell you drift happened — it tells you **which change caused it**, **what would happen if you removed it**, and **what action to take**.
+This assumption **breaks in production**.
+
+When it does:
+- System behavior becomes unpredictable
+- Output quality degrades silently
+- Failure modes cluster in unseen regions
+
+Traditional evaluation tools measure:
+
+```text
+Input → Output correctness
+```
+
+This is **pointwise evaluation**.
+
+Sentrix Evaluator measures **distribution-level alignment**:
+
+```text
+Distribution(Past) ≠ Distribution(Current)
+```
+
+Even if individual outputs appear correct, **systematic drift** accumulates — and systems fail **statistically, not individually**.
+
+---
+
+## Theoretical Foundations
+
+### Latent Space Drift
+
+AI systems operate over **vector spaces** that encode semantic meaning. Over time, system changes distort this space:
+
+- **Model Updates** — Changing system configurations or pipeline versions shifts vector geometry
+- **Data Distribution Shift** — New query patterns alter the density and topology of evaluated data
+- **Configuration Drift** — Parameter changes (thresholds, model settings) incrementally degrade performance
+
+These forces create **distribution misalignment** between:
+- Historical baseline (reference state)
+- Current state (latest evaluations)
+
+### Why Distribution-Level Evaluation Matters
+
+Pointwise metrics can mask systemic degradation. A system may produce correct outputs on most queries while **silently failing on emerging clusters** of inputs it has never seen before.
+
+Sentrix detects this through:
+
+1. **Jensen-Shannon Divergence (JSD)**
+   Measures divergence between baseline and current metric distributions:
+
+   ```text
+   0 ≤ JSD(P || Q) ≤ 1
+   ```
+   - `0` → identical distributions
+   - `> threshold` → significant drift requiring intervention
+
+2. **Causal Attribution**
+   Once drift is detected, heuristic scoring ranks system changes by their contribution to the observed shift — answering *"which change caused this?"*
+
+3. **Counterfactual Simulation**
+   Each ranked change is simulated in reverse: *"What if this change had not occurred?"* The engine clones the history store, reverts the change, and re-estimates metric values deterministically.
+
+4. **Optimization Engine**
+   The most impactful counterfactual is translated into a concrete, ranked recommendation: *"Revert model in run_42 (expected improvement: 0.40, confidence: 92%)."*
+
+This end-to-end pipeline converts **statistical signals** into **actionable decisions**.
 
 ---
 
 ## Core Capabilities
 
-| Capability | Description |
+| Capability | What it does |
 |---|---|
-| **Drift Detection** | Sliding-window mean-shift detection over any metric series |
-| **Causal Attribution** | Heuristic scoring ranks system changes by contribution to drift |
-| **Counterfactual Simulation** | Simulates "what if this change had not occurred?" via store cloning & metric re-estimation |
-| **Optimization Engine** | Converts causal factors + counterfactuals into ranked, actionable recommendations |
-| **API Layer** | RESTful HTTP endpoints for all pipeline stages |
-| **CLI** | Diagnostic commands for store inspection and drift evaluation |
+| **Drift Detection** | Sliding-window mean-shift detection on any metric series using Jensen-Shannon divergence |
+| **Causal Attribution** | Heuristic scoring ranks system changes by contribution to detected drift |
+| **Counterfactual Simulation** | Simulates "what if this change had not occurred?" via non-mutating store cloning |
+| **Optimization Engine** | Generates ranked, actionable remediation recommendations from simulation results |
+| **API Layer** | RESTful HTTP endpoints exposing the full pipeline (/drift, /attribution, /counterfactual, /optimize) |
+| **CLI Interface** | Diagnostic commands for store inspection and drift evaluation |
 
 ---
 
@@ -59,10 +103,10 @@ JSONHistoryStore
    DriftEvent           (Phase 4 — temporal drift detection)
       │
       ▼
-CausalAttribution        (Phase 5 — root-cause ranking)
+CausalAttribution       (Phase 5 — root-cause ranking)
       │
       ▼
-CounterfactualResult     (Phase 6 — simulation)
+CounterfactualResult    (Phase 6 — simulation)
       │
       ▼
 OptimizationPlan        (Phase 7 — actionable recommendations)
@@ -71,7 +115,7 @@ OptimizationPlan        (Phase 7 — actionable recommendations)
       API                 (Phase 8 — HTTP endpoints)
 ```
 
-Each stage consumes the output of the previous one. The pipeline is fully deterministic — no randomness, no ML dependencies, no hidden state.
+Each stage consumes the output of the previous one. The pipeline is **fully deterministic** — no randomness, no ML libraries, no hidden state.
 
 ---
 
@@ -98,11 +142,11 @@ evaluator/
 │   ├── actions.py
 │   ├── scorer.py
 │   └── models.py          # OptimizationAction, OptimizationRecommendation, OptimizationPlan
-├── storage/            # History persistence
+├── storage/            # File-backed JSONL history persistence
 │   ├── json_store.py    # JSONHistoryStore
 │   └── models.py        # EvaluationRecord
 └── metrics/            # Metric definitions
-    ├── drift/           # Drift metrics (e.g., Jensen-Shannon divergence)
+    ├── drift/           # Drift metrics (Jensen-Shannon divergence)
     ├── quality/         # Quality metrics
     └── results.py       # MetricResult, DriftResult, QualityResult
 
@@ -117,19 +161,33 @@ api/
 ├── main.py             # FastAPI app factory
 └── config.py           # Application configuration
 
-cli/                    # CLI diagnostic tool
-└── drift_cli.py
+cli/
+└── drift_cli.py        # CLI diagnostic tool
+
+scripts/
+└── seed_db.py          # Database initialization
+
+tests/
+├── test_api.py                   # Phase 8: API integration tests
+├── test_counterfactual.py        # Phase 6: simulation tests
+├── test_optimization.py          # Phase 7: optimization tests
+├── test_causal_attribution.py    # Phase 5: attribution tests
+├── test_temporal_analysis.py     # Phase 4: drift detection tests
+├── test_history_store.py         # Phase 3: storage tests
+├── test_drift_math.py            # Drift math correctness
+├── test_drift_properties.py      # Distribution property tests
+└── test_run_schema.py            # Phase 1: schema validation
 ```
 
 ### Module Summary
 
 | Module | Responsibility |
 |---|---|
-| `evaluator/temporal/` | Detects drift events from metric series using sliding-window mean-shift |
-| `evaluator/causal/` | Extracts system-change events, builds feature vectors, scores causal impact |
-| `evaluator/counterfactual/` | Simulates interventions by cloning the history store and reverting changes |
-| `evaluator/optimization/` | Maps changes to concrete actions, scores expected improvement, ranks recommendations |
-| `evaluator/storage/` | File-backed JSONL history store for evaluation records |
+| `evaluator/temporal/` | Detects drift events from metric time-series using sliding-window mean-shift with JSD |
+| `evaluator/causal/` | Extracts system-change events, builds feature vectors, scores causal impact via heuristic weighted composite |
+| `evaluator/counterfactual/` | Simulates interventions by cloning the history store and reverting changes non-mutatingly |
+| `evaluator/optimization/` | Maps changes to remediation actions, scores expected improvement, ranks recommendations |
+| `evaluator/storage/` | JSONL-backed history store for evaluation records |
 | `evaluator/metrics/` | Metric computation (drift + quality) with structured results |
 | `api/` | HTTP API exposing the full pipeline as REST endpoints |
 | `cli/` | Command-line diagnostics and alerting |
@@ -169,15 +227,16 @@ events = detect_drift_from_store(
     store, metric_name="js_divergence", window_size=3, threshold=0.15
 )
 
-# 2. Explain root cause
-attribution = attribute_drift(events[0], store)
+if events:
+    # 2. Explain root cause
+    attribution = attribute_drift(events[0], store)
 
-# 3. Simulate alternatives
-counterfx = run_counterfactual_analysis(events[0], attribution, store)
+    # 3. Simulate alternatives
+    counterfx = run_counterfactual_analysis(events[0], attribution, store)
 
-# 4. Get recommendations
-plan = generate_optimization_plan(events[0], attribution, counterfx)
-print(plan.summary)
+    # 4. Get recommendations
+    plan = generate_optimization_plan(events[0], attribution, counterfx)
+    print(plan.summary)
 ```
 
 ### API Usage
@@ -196,7 +255,7 @@ curl -X POST http://localhost:8000/optimize \
 
 ```bash
 python -m cli.drift_cli stats
-python -m cli.drift_cli evaluate --baseline-id naive --current-id agentic
+python -m cli.drift_cli evaluate --baseline-id group_a --current-id group_b
 ```
 
 ---
@@ -244,7 +303,7 @@ All endpoints use `POST` and accept JSON request bodies. The history store path 
       }
     }
   ],
-  "summary": "Top recommendation: revert model in run run_42 (expected improvement: 0.4)",
+  "summary": "Top recommendation: revert model change in run run_42 (expected improvement: 0.4)",
   "metadata": {
     "metric_name": "js_divergence",
     "num_actions": 1,
@@ -258,12 +317,13 @@ All endpoints use `POST` and accept JSON request bodies. The history store path 
 
 ## Design Principles
 
-1. **Deterministic** — Every operation produces identical output given identical input. No randomness, no ML libraries.
-2. **Modular Architecture** — Each phase (detect, explain, simulate, act) is a standalone module with clear interfaces.
-3. **No ML Dependency (Yet)** — Causal scoring uses deterministic heuristic weights, not trained models.
-4. **Reproducibility** — `change_id` values are generated as deterministic UUIDv5, ensuring stable cross-module references across runs.
-5. **Non-Mutating** — Counterfactual simulation clones the history store; the original data is never modified.
-6. **API-Core Separation** — The FastAPI layer wraps core logic with Pydantic schemas; internal dataclasses are never exposed directly.
+1. **Distribution-First Evaluation** — Measures systemic drift, not just pointwise correctness
+2. **Deterministic Reproducibility** — Every operation produces identical output given identical input. No randomness, no ML dependencies.
+3. **Non-Mutating Simulation** — Counterfactual analysis clones the history store; original data is never modified
+4. **Modular Architecture** — Each phase (detect, explain, simulate, act) is a standalone module with clear interfaces
+5. **Actionable Insights** — Converts statistical signals into ranked, concrete recommendations
+6. **API-Core Separation** — The FastAPI layer wraps core logic with Pydantic schemas; internal dataclasses are never exposed directly
+7. **Stable Cross-Module Identity** — `change_id` values use deterministic UUIDv5 for stable references across all pipeline stages
 
 ---
 
@@ -277,7 +337,14 @@ pytest
 ruff check
 ```
 
-Test suite covers all phases (4–8) including model serialization, pipeline integration, endpoint behavior, and edge cases (empty stores, invalid payloads, no-drift scenarios).
+The test suite covers all phases (1–8) including:
+- Schema validation and serialization round-trips
+- Drift detection math correctness
+- Causal attribution scoring and ranking
+- Counterfactual simulation (store cloning, metric re-estimation)
+- Optimization action generation and recommendation ranking
+- API endpoint behavior (request/response, error handling, empty stores)
+- End-to-end pipeline integration
 
 ---
 
@@ -293,7 +360,13 @@ Test suite covers all phases (4–8) including model serialization, pipeline int
 | **Dashboard UI** | Planned |
 | **Autonomous Execution Loop** | Planned |
 | **CI/CD Integration** | Planned |
-| **ML-augmented Attribution** | Research |
+| **ML-Augmented Attribution** | Research |
+
+---
+
+## Contributing
+
+Pull requests, experiments, and research extensions are welcome.
 
 ---
 
