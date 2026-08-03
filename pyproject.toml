@@ -35,6 +35,7 @@ dev = [
 [project.scripts]
 sentrix = "cli.sentrix_cli:main"
 drift-cli = "cli.drift_cli:main"
+sentrix-serve = "evaluator.api.app:app"
 
 [tool.setuptools.packages.find]
 include = ["evaluator*", "scripts*", "api*", "ingestion*", "alerting*", "cli*"]
