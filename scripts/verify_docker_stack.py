@@ -95,6 +95,8 @@ def make_frame(
 
 def make_ragrun(idx: int, embedding_dim: int = 8, seed: int | None = None) -> RAGRun:
     """Build a canonical :class:`RAGRun` from the same test data as :func:`make_frame`."""
+    from ingestion.run_schema import RAGSystemInfo
+
     rng = random.Random(seed if seed is not None else idx)
     embedding = [rng.gauss(0, 1) for _ in range(embedding_dim)]
     embedding_arr = np.asarray(embedding, dtype=float)
@@ -108,6 +110,13 @@ def make_ragrun(idx: int, embedding_dim: int = 8, seed: int | None = None) -> RA
         query_embedding=embedding_arr,
         answer=f"answer_{idx}",
         answer_embedding=embedding_arr,
+        system_info=RAGSystemInfo(
+            name="AgenticRAG",
+            model="gpt-4o-mini",
+            embedding_model="text-embedding-3-small",
+            retriever="vector",
+            version="0.1.0",
+        ),
         metadata={
             "rag_type": "agentic",
             "agent_hops": ["retriever", "reader", "retriever"],

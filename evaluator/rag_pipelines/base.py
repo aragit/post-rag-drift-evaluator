@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import asdict as _asdict
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -46,11 +47,21 @@ class RAGResponse(BaseModel):
         ``np.ndarray`` and pipeline metadata is preserved in
         ``RAGRun.metadata``.
         """
-        from ingestion.run_schema import RAGRun
+        from ingestion.run_schema import RAGRun, RAGSystemInfo
 
         metadata = dict(self.metadata)
         metadata["reflection_iterations"] = self.reflection_iterations
         metadata["final_confidence"] = self.final_confidence
+
+        system_info = None
+        if "pipeline_name" in self.metadata:
+            system_info = RAGSystemInfo(
+                name=self.metadata.get("pipeline_name"),
+                model=self.metadata.get("model"),
+                embedding_model=self.metadata.get("embedding_model"),
+                retriever=self.metadata.get("retriever"),
+                version=self.metadata.get("version"),
+            )
 
         return RAGRun(
             query=self.query,
@@ -61,6 +72,7 @@ class RAGResponse(BaseModel):
                 else None
             ),
             answer=self.generated_answer,
+            system_info=system_info,
             metadata=metadata,
         )
 
@@ -68,13 +80,22 @@ class RAGResponse(BaseModel):
     def from_ragrun(cls, run: RAGRun) -> RAGResponse:
         """Construct a legacy ``RAGResponse`` from a canonical ``RAGRun``.
 
-        Extra fields (``retrieved_doc_ids``, ``answer_embedding``,
-        ``timestamp``, ``system_version``) that have no counterpart in
-        ``RAGResponse`` are dropped or folded into ``metadata``.
+        ``RAGSystemInfo`` and RAGRun-only fields (``run_id``,
+        ``schema_version``, ``timestamp``) are folded into
+        ``metadata`` since ``RAGResponse`` has no dedicated slots.
         """
         metadata = dict(run.metadata)
         metadata.setdefault("reflection_iterations", 0)
         metadata.setdefault("final_confidence", 0.0)
+
+        if run.run_id is not None:
+            metadata["run_id"] = run.run_id
+        if run.schema_version is not None:
+            metadata["schema_version"] = run.schema_version
+        if run.timestamp is not None:
+            metadata["timestamp"] = run.timestamp
+        if run.system_info is not None:
+            metadata["system_info"] = _asdict(run.system_info)
 
         return cls(
             query=run.query,

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import time
+import uuid
 
 import numpy as np
 import pytest
 
-from ingestion.run_schema import RAGRun
+from ingestion.run_schema import SCHEMA_VERSION, RAGRun, RAGSystemInfo
 
 # ── Creation & Basic Invariants ──────────────────────────────────────────
 
@@ -265,3 +267,139 @@ def test_ragrun_drifts_monitor():
     assert "js_divergence" in result
     assert "mmd_score" in result
     assert "is_drifted" in result
+
+
+# ── Phase 1.5: Schema Hardening ──────────────────────────────────────────
+
+
+def test_schema_version_present():
+    run = RAGRun(query="q", retrieved_docs=["d"])
+    assert run.schema_version == SCHEMA_VERSION
+    assert run.schema_version == "1.0"
+
+
+def test_run_id_auto_generated():
+    run = RAGRun(query="q", retrieved_docs=["d"])
+    assert run.run_id is not None
+    # Should be a valid UUID string
+    uuid.UUID(run.run_id)
+
+
+def test_run_id_preserved_when_provided():
+    custom_id = "custom-run-123"
+    run = RAGRun(query="q", retrieved_docs=["d"], run_id=custom_id)
+    assert run.run_id == custom_id
+
+
+def test_system_info_default_none():
+    run = RAGRun(query="q", retrieved_docs=["d"])
+    assert run.system_info is None
+
+
+def test_system_info_with_ragrun():
+    info = RAGSystemInfo(
+        name="NaiveRAG",
+        model="gpt-4o",
+        embedding_model="text-embedding-3-small",
+        retriever="BM25",
+        version="0.1.0",
+    )
+    run = RAGRun(
+        query="test",
+        retrieved_docs=["doc1", "doc2"],
+        system_info=info,
+    )
+    run.validate()
+    assert run.system_info is not None
+    assert run.system_info.name == "NaiveRAG"
+    assert run.system_info.model == "gpt-4o"
+    assert run.system_info.embedding_model == "text-embedding-3-small"
+    assert run.system_info.retriever == "BM25"
+    assert run.system_info.version == "0.1.0"
+
+
+# ── Serialization Stability (JSON round-trip) ─────────────────────────────
+
+
+def test_json_round_trip_basic():
+    run = RAGRun(query="q", retrieved_docs=["d1", "d2"], answer="ans")
+    d = run.to_dict()
+    j = json.dumps(d)
+    restored = RAGRun.from_dict(json.loads(j))
+    assert restored.query == run.query
+    assert restored.retrieved_docs == run.retrieved_docs
+    assert restored.answer == run.answer
+    assert restored.run_id == run.run_id
+    assert restored.schema_version == run.schema_version
+
+
+def test_json_round_trip_with_embeddings():
+    emb = np.array([0.1, 0.2, 0.3])
+    info = RAGSystemInfo(
+        name="TestRAG", model="m", embedding_model="e", retriever="r", version="v1"
+    )
+    run = RAGRun(
+        query="q",
+        retrieved_docs=["d1", "d2"],
+        retrieved_doc_ids=["id1", "id2"],
+        retrieved_embeddings=[emb, emb.copy()],
+        query_embedding=emb,
+        answer="ans",
+        answer_embedding=emb,
+        system_info=info,
+        metadata={"key": "value"},
+    )
+    d = run.to_dict()
+    j = json.dumps(d)
+    restored = RAGRun.from_dict(json.loads(j))
+    restored.validate()
+    assert restored.query == run.query
+    assert restored.run_id == run.run_id
+    assert restored.schema_version == run.schema_version
+    assert np.allclose(restored.query_embedding, emb)
+    assert np.allclose(restored.answer_embedding, emb)
+    assert np.allclose(restored.retrieved_embeddings[0], emb)
+    assert restored.system_info is not None
+    assert restored.system_info.name == "TestRAG"
+    assert restored.metadata == {"key": "value"}
+
+
+def test_json_serialization_no_numpy_errors():
+    """Ensure to_dict output is pure JSON-serializable (no numpy types)."""
+    emb = np.array([0.1, 0.2, 0.3])
+    run = RAGRun(
+        query="q",
+        retrieved_docs=["d1"],
+        query_embedding=emb,
+        answer_embedding=emb,
+        retrieved_embeddings=[emb],
+    )
+    d = run.to_dict()
+    # Should not raise TypeError for numpy types
+    j = json.dumps(d)
+    # And should be parseable back
+    RAGRun.from_dict(json.loads(j))
+
+
+def test_ragresponse_round_trip_with_phase15():
+    """RAGResponse → RAGRun → RAGResponse preserves new fields in metadata."""
+    from evaluator.rag_pipelines.base import RAGResponse
+
+    resp = RAGResponse(
+        query="test",
+        retrieved_contexts=["ctx1", "ctx2"],
+        generated_answer="answer",
+        query_embedding=[0.1, 0.2],
+        metadata={"token_usage": {"total_tokens": 50}},
+    )
+    run = resp.to_ragrun()
+    assert run.schema_version == SCHEMA_VERSION
+    assert run.run_id is not None
+    assert run.system_info is None  # No pipeline metadata to extract
+
+    resp2 = RAGResponse.from_ragrun(run)
+    assert resp2.query == resp.query
+    assert resp2.query_embedding == resp.query_embedding
+    assert "run_id" in resp2.metadata
+    assert "schema_version" in resp2.metadata
+    assert "timestamp" in resp2.metadata

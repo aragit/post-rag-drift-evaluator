@@ -1,10 +1,30 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import numpy as np
+
+SCHEMA_VERSION = "1.0"
+
+
+@dataclass
+class RAGSystemInfo:
+    """Identity metadata for the evaluated RAG pipeline.
+
+    Structurally captures *which* system produced a run so that
+    cross-pipeline comparisons (e.g. NaiveRAG vs AgenticRAG with
+    different embedding models or retrievers) are possible at
+    query time rather than via ad-hoc metadata lookup.
+    """
+
+    name: str
+    model: str | None = None
+    embedding_model: str | None = None
+    retriever: str | None = None
+    version: str | None = None
 
 
 @dataclass
@@ -16,9 +36,13 @@ class RAGRun:
     a consistent, typed object instead of loose dicts.
     """
 
-    query: str
+    schema_version: str = SCHEMA_VERSION
 
-    retrieved_docs: list[str]
+    run_id: str | None = None
+
+    query: str = ""
+
+    retrieved_docs: list[str] = field(default_factory=list)
     retrieved_doc_ids: list[str] | None = None
 
     retrieved_embeddings: list[np.ndarray] | None = None
@@ -27,12 +51,16 @@ class RAGRun:
     answer: str | None = None
     answer_embedding: np.ndarray | None = None
 
+    system_info: RAGSystemInfo | None = None
+
     metadata: dict[str, Any] = field(default_factory=dict)
 
     timestamp: float | None = None
     system_version: str | None = None
 
     def __post_init__(self) -> None:
+        if self.run_id is None:
+            self.run_id = str(uuid.uuid4())
         if self.timestamp is None:
             self.timestamp = time.time()
 
@@ -70,16 +98,23 @@ class RAGRun:
         kwargs: dict[str, Any] = {}
 
         for key in (
+            "schema_version",
+            "run_id",
             "query",
             "retrieved_docs",
             "retrieved_doc_ids",
             "answer",
+            "system_info",
             "metadata",
             "timestamp",
             "system_version",
         ):
             if key in data:
-                kwargs[key] = data[key]
+                value = data[key]
+                if key == "system_info" and value is not None:
+                    kwargs[key] = RAGSystemInfo(**value)
+                else:
+                    kwargs[key] = value
 
         if "retrieved_embeddings" in data and data["retrieved_embeddings"] is not None:
             kwargs["retrieved_embeddings"] = [
@@ -98,6 +133,7 @@ class RAGRun:
         """Serialize the run to a plain dictionary.
 
         Numpy arrays are converted to lists for JSON compatibility.
+        ``RAGSystemInfo`` is serialized to a nested dict.
         """
 
         def _embed_to_list(arr: np.ndarray | None) -> list[float] | None:
@@ -106,6 +142,8 @@ class RAGRun:
             return arr.tolist()
 
         return {
+            "schema_version": self.schema_version,
+            "run_id": self.run_id,
             "query": self.query,
             "retrieved_docs": self.retrieved_docs,
             "retrieved_doc_ids": self.retrieved_doc_ids,
@@ -117,6 +155,9 @@ class RAGRun:
             "query_embedding": _embed_to_list(self.query_embedding),
             "answer": self.answer,
             "answer_embedding": _embed_to_list(self.answer_embedding),
+            "system_info": (
+                asdict(self.system_info) if self.system_info is not None else None
+            ),
             "metadata": self.metadata,
             "timestamp": self.timestamp,
             "system_version": self.system_version,
