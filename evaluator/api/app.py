@@ -8,7 +8,7 @@ and closed-loop remediation.  All operations run in-memory using
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -182,7 +182,7 @@ def create_production_app(
         """Detect dual-track latent drift between baseline and current embeddings."""
         track: Literal["retrieval", "generation", "unified"]
         if request.track in ("retrieval", "generation"):
-            track = request.track
+            track = cast(Literal["retrieval", "generation", "unified"], request.track)
         else:
             track = "unified"
         baseline = EmbeddingBatch(
