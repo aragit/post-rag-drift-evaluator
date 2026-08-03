@@ -1,3 +1,4 @@
+from evaluator.latent_drift.adaptive import AdaptiveThresholdManager
 from evaluator.latent_drift.distance import compute_mmd, compute_swd
 from evaluator.latent_drift.engine import (
     LatentDriftEngine,
@@ -8,9 +9,12 @@ from evaluator.latent_drift.jsd import compute_jsd
 from evaluator.latent_drift.kde import evaluate_density, fit_kde
 from evaluator.latent_drift.pca import fit_pca, project_vectors
 from evaluator.latent_drift.schemas import EmbeddingBatch, LatentDriftResult
+from evaluator.latent_drift.streaming import StreamingDriftBuffer
 
 __all__ = [
+    "AdaptiveThresholdManager",
     "LatentDriftEngine",
+    "StreamingDriftBuffer",
     "compute_latent_drift",
     "detect_latent_drift_events",
     "compute_jsd",

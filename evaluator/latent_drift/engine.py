@@ -17,7 +17,7 @@ counterfactual simulation, and optimization pipeline.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -27,6 +27,9 @@ from evaluator.latent_drift.kde import evaluate_density, fit_kde
 from evaluator.latent_drift.pca import fit_pca, project_vectors
 from evaluator.latent_drift.schemas import EmbeddingBatch, LatentDriftResult
 from evaluator.temporal.models import DriftEvent
+
+if TYPE_CHECKING:
+    from evaluator.latent_drift.adaptive import AdaptiveThresholdManager
 
 _EPSILON = 1e-12
 _DEFAULT_KDE_SAMPLE_SIZE = 1000
@@ -42,9 +45,13 @@ class LatentDriftEngine:
 
     Attributes:
         threshold: Drift threshold for the score.
-        metric: Distance metric to use (``"mmd"``, ``"swd"``, or ``"jsd"``).
+        metric: Distance metric to use (``"mmd"``, ``"swd"``, or ``"jsd""``).
         pca_components: Number of PCA components to retain.
         kde_sample_size: Maximum grid points for KDE evaluation (JSD only).
+        threshold_manager: Optional :class:`AdaptiveThresholdManager` for
+            dynamic threshold computation.  When set, the adaptive
+            threshold overrides the static ``threshold`` during
+            :meth:`compute_drift`.
     """
 
     def __init__(
@@ -53,6 +60,7 @@ class LatentDriftEngine:
         metric: str = "mmd",
         pca_components: int = 5,
         kde_sample_size: int = _DEFAULT_KDE_SAMPLE_SIZE,
+        threshold_manager: AdaptiveThresholdManager | None = None,
     ):
         if metric not in _VALID_METRICS:
             raise ValueError(
@@ -62,6 +70,7 @@ class LatentDriftEngine:
         self.metric = metric
         self.pca_components = pca_components
         self.kde_sample_size = kde_sample_size
+        self.threshold_manager = threshold_manager
         self.pca: Any = None
         self.kde_baseline: Any = None
         self._baseline_proj: np.ndarray | None = None
@@ -118,17 +127,25 @@ class LatentDriftEngine:
 
         drift_score = self._compute_metric(baseline_proj, current_proj)
 
+        # Use adaptive threshold if manager is configured
+        if self.threshold_manager is not None:
+            self.threshold_manager.update(drift_score)
+            effective_threshold = self.threshold_manager.get_threshold()
+        else:
+            effective_threshold = self.threshold
+
         metadata = {
             "pca_components": self.pca.n_components_,
             "explained_variance_ratio": self.pca.explained_variance_ratio_.tolist(),
             "metric": self.metric,
             "kde_sample_size": self.kde_sample_size,
+            "adaptive_threshold": self.threshold_manager is not None,
         }
 
         return LatentDriftResult(
             drift_score=drift_score,
-            drift_detected=drift_score > self.threshold,
-            threshold=self.threshold,
+            drift_detected=drift_score > effective_threshold,
+            threshold=effective_threshold,
             n_samples_baseline=baseline_proj.shape[0],
             n_samples_current=current_proj.shape[0],
             metric_used=self.metric,
