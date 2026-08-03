@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 
 from evaluator.storage.models import EvaluationRecord
 
@@ -82,3 +83,28 @@ class JSONHistoryStore:
             for r in self.load_all()
             if any(m.metric_name == metric_name for m in r.metrics)
         ]
+
+    def clone(self, path: str | None = None) -> JSONHistoryStore:
+        """Create a copy of this store at a new path.
+
+        The new store contains all records from the original,
+        written in a single batch for efficiency.
+
+        Args:
+            path: Optional explicit path for the clone.  When
+                ``None`` (default) a temporary file is created.
+
+        Returns:
+            A new :class:`JSONHistoryStore` pointing to the copied data.
+        """
+        if path is None:
+            fd, path = tempfile.mkstemp(suffix=".jsonl", dir="/tmp/opencode")
+            os.close(fd)
+
+        clone_store = JSONHistoryStore(path)
+        records = self.load_all()
+        lines = [json.dumps(r.to_dict()) for r in records]
+        with open(path, "w") as f:
+            if lines:
+                f.write("\n".join(lines) + "\n")
+        return clone_store

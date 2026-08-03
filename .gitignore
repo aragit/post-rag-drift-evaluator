@@ -12,3 +12,4 @@ venv/
 .drift_history.db
 .DS_Store
 SOURCE_CODE_REFERENCE.md
+.agents/

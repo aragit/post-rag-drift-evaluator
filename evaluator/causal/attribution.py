@@ -71,6 +71,7 @@ def score_causal_impact(features: list[dict[str, Any]]) -> list[CausalFactor]:
                 score=round(score, 4),
                 related_run_ids=[feat["run_id"]],
                 metadata={
+                    "change_id": feat["change_id"],
                     "time_delta": feat["time_delta"],
                     "in_window": feat["in_window"],
                     "change_details": feat["details"],

@@ -21,7 +21,14 @@ class ChangeEvent:
 
     def __post_init__(self) -> None:
         if self.change_id is None:
-            self.change_id = str(uuid.uuid4())
+            import uuid
+
+            self.change_id = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_OID,
+                    f"{self.run_id}:{self.timestamp}:{self.change_type}",
+                )
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
