@@ -8,8 +8,7 @@ and closed-loop remediation.  All operations run in-memory using
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
