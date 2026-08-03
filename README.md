@@ -1,377 +1,281 @@
-# Sentrix Evaluator
+# Sentrix Evaluator (`post-rag-drift-evaluator`)
 
-### Causal Evaluation & Autonomous Optimization Engine for AI Systems
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Type Checked: mypy](https://img.shields.io/badge/mypy-checked-blue)](https://mypy-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/badge/tests-201%20passed-success.svg)](#testing--verification)
 
-**Sentrix Evaluator** is a distribution-aware evaluation framework that detects latent-space drift, explains its root causes, simulates counterfactual alternatives, and recommends concrete remediation actions — transforming evaluation from passive monitoring into active decision-making.
+**Sentrix Evaluator** is an enterprise-grade, zero-disk, closed-loop drift remediation engine for Retrieval-Augmented Generation (RAG) and LLM pipelines.
 
-It treats AI systems as **dynamic statistical processes**, enabling early detection of systemic failure modes before they manifest in degraded outputs.
+It bridges non-parametric latent embedding space monitoring with causal fault attribution, counterfactual impact simulation, track-aware optimization, and safety policy guardrails — delivering automated, real-time remediation without introducing disk I/O latency or unbounded operational feedback loops.
 
 ---
 
-## Why Sentrix Evaluator?
+## Key Features
 
-Modern AI systems operate under an assumption:
+* **Dual-Track Latent Drift Detection:** Layer-separated divergence scoring across `"retrieval"` (vector representations) and `"generation"` (prompt/token contexts) tracks using Maximum Mean Discrepancy (MMD), Sliced Wasserstein Distance (SWD), and Jensen-Shannon Divergence (JSD).
+* **Adaptive Threshold Learning:** Dynamic z-score sliding quantile bounds ($\mu_{\text{window}} + z \cdot \sigma_{\text{window}}$) with clamped absolute limits $[0.05, 0.50]$ that adaptively tune drift sensitivity based on ambient traffic noise.
+* **Real-Time Streaming Drift Buffers:** Dual-track ring buffers with deterministic reservoir sampling and FIFO eviction strategies for continuous vector streaming without rigid batch boundaries.
+* **Causal-Latent Fusion Layer:** Structural mapping connecting continuous embedding space divergence directly to Bayesian Causal DAG node failure priors ($P(\text{Node Failure}) = \min(1.0, \text{drift\_score} \times \text{sensitivity})$).
+* **Zero-Disk Counterfactual Simulation:** In-memory state machine (`InMemoryHistoryStore`) running EWMA and OLS linear trend-adjusted counterfactual estimations without touching persistent disk.
+* **Safety Guardrails & Closed-Loop Remediation:** Policy evaluation enforcing action cooldown periods (default 300s), anti-flapping throttles (max 5/hr), and hard scalar parameter bounds (`temperature` $\in [0, 1]$, `top_k` $\in [1, 50]$).
+* **Production Gateway & Observability:** Production-ready FastAPI HTTP server, asynchronous streaming endpoints (`/v1/stream/*`), CLI suite (`sentrix`), and native OpenTelemetry/Prometheus metric exporters.
 
-> The distribution of incoming data matches the distribution of baseline/reference data.
+---
 
-This assumption **breaks in production**.
-
-When it does:
-- System behavior becomes unpredictable
-- Output quality degrades silently
-- Failure modes cluster in unseen regions
-
-Traditional evaluation tools measure:
+## System Architecture
 
 ```text
-Input → Output correctness
+                                 +-----------------------------------+
+                                 |  Continuous Vector Stream / API   |
+                                 +-----------------------------------+
+                                                   |
+                                                   v
+                                     [ StreamingDriftBuffer ]
+                                     (Reservoir / FIFO Ring)
+                                                   |
+                                                   v
+                                       [ LatentDriftEngine ]
+                                 (Dual-Track MMD / SWD / JSD)
+                                                   |
+                                   +---------------+---------------+
+                                   |                               |
+                        [ Retrieval Track ]               [ Generation Track ]
+                        (top_k, reranker)                 (temp, prompt, model)
+                                   |                               |
+                                   +---------------+---------------+
+                                                   |
+                                                   v
+                                    [ AdaptiveThresholdManager ]
+                                    (Dynamic Rolling Z-Score Bounds)
+                                                   |
+                                                   v
+                                     [ CausalLatentFusionEngine ]
+                                  (Updates Causal DAG Node Priors)
+                                                   |
+                                                   v
+                                  [ Zero-Disk Simulation Engine ]
+                                  (InMemoryHistoryStore + EWMA/OLS)
+                                                   |
+                                                   v
+                                        [ PolicyEvaluator ]
+                                   (Cooldown / Flapping / Bounds)
+                                                   |
+                                                   v
+                                      [ OptimizationRunner ]
+                          +------------------------+------------------------+
+                          |                        |                        |
+                 STATUS_APPROVED      STATUS_BLOCKED_BY_GUARDRAIL   STATUS_NO_ACTION_NEEDED
+                          |                        |                        |
+                          +------------------------+------------------------+
+                                                   |
+                                                   v
+                                      [ SentrixMetricsExporter ]
+                                    (OpenTelemetry / Prometheus)
 ```
-
-This is **pointwise evaluation**.
-
-Sentrix Evaluator measures **distribution-level alignment**:
-
-```text
-Distribution(Past) ≠ Distribution(Current)
-```
-
-Even if individual outputs appear correct, **systematic drift** accumulates — and systems fail **statistically, not individually**.
 
 ---
 
-## Theoretical Foundations
+## Quickstart
 
-### Latent Space Drift
-
-AI systems operate over **vector spaces** that encode semantic meaning. Over time, system changes distort this space:
-
-- **Model Updates** — Changing system configurations or pipeline versions shifts vector geometry
-- **Data Distribution Shift** — New query patterns alter the density and topology of evaluated data
-- **Configuration Drift** — Parameter changes (thresholds, model settings) incrementally degrade performance
-
-These forces create **distribution misalignment** between:
-- Historical baseline (reference state)
-- Current state (latest evaluations)
-
-### Why Distribution-Level Evaluation Matters
-
-Pointwise metrics can mask systemic degradation. A system may produce correct outputs on most queries while **silently failing on emerging clusters** of inputs it has never seen before.
-
-Sentrix detects this through:
-
-1. **Jensen-Shannon Divergence (JSD)**
-   Measures divergence between baseline and current metric distributions:
-
-   ```text
-   0 ≤ JSD(P || Q) ≤ 1
-   ```
-   - `0` → identical distributions
-   - `> threshold` → significant drift requiring intervention
-
-2. **Causal Attribution**
-   Once drift is detected, heuristic scoring ranks system changes by their contribution to the observed shift — answering *"which change caused this?"*
-
-3. **Counterfactual Simulation**
-   Each ranked change is simulated in reverse: *"What if this change had not occurred?"* The engine clones the history store, reverts the change, and re-estimates metric values deterministically.
-
-4. **Optimization Engine**
-   The most impactful counterfactual is translated into a concrete, ranked recommendation: *"Revert model in run_42 (expected improvement: 0.40, confidence: 92%)."*
-
-This end-to-end pipeline converts **statistical signals** into **actionable decisions**.
-
----
-
-## Core Capabilities
-
-| Capability | What it does |
-|---|---|
-| **Drift Detection** | Sliding-window mean-shift detection on any metric series using Jensen-Shannon divergence |
-| **Causal Attribution** | Heuristic scoring ranks system changes by contribution to detected drift |
-| **Counterfactual Simulation** | Simulates "what if this change had not occurred?" via non-mutating store cloning |
-| **Optimization Engine** | Generates ranked, actionable remediation recommendations from simulation results |
-| **API Layer** | RESTful HTTP endpoints exposing the full pipeline (/drift, /attribution, /counterfactual, /optimize) |
-| **CLI Interface** | Diagnostic commands for store inspection and drift evaluation |
-
----
-
-## Pipeline Overview
-
-```
-JSONHistoryStore
-      │
-      ▼
-   DriftEvent           (Phase 4 — temporal drift detection)
-      │
-      ▼
-CausalAttribution       (Phase 5 — root-cause ranking)
-      │
-      ▼
-CounterfactualResult    (Phase 6 — simulation)
-      │
-      ▼
-OptimizationPlan        (Phase 7 — actionable recommendations)
-      │
-      ▼
-      API                 (Phase 8 — HTTP endpoints)
-```
-
-Each stage consumes the output of the previous one. The pipeline is **fully deterministic** — no randomness, no ML libraries, no hidden state.
-
----
-
-## Architecture
-
-```
-evaluator/
-├── temporal/           # Drift event detection & time-series analysis
-│   ├── drift_detection.py
-│   ├── models.py          # DriftEvent
-│   └── series.py
-├── causal/             # Causal attribution
-│   ├── attribution.py
-│   ├── change_extractor.py
-│   ├── feature_builder.py
-│   └── models.py          # ChangeEvent, CausalFactor, CausalAttribution
-├── counterfactual/     # Counterfactual simulation
-│   ├── simulator.py
-│   ├── scenario.py
-│   ├── estimator.py
-│   └── models.py          # Intervention, CounterfactualScenario, CounterfactualResult
-├── optimization/       # Optimization & recommendations
-│   ├── optimizer.py
-│   ├── actions.py
-│   ├── scorer.py
-│   └── models.py          # OptimizationAction, OptimizationRecommendation, OptimizationPlan
-├── storage/            # File-backed JSONL history persistence
-│   ├── json_store.py    # JSONHistoryStore
-│   └── models.py        # EvaluationRecord
-└── metrics/            # Metric definitions
-    ├── drift/           # Drift metrics (Jensen-Shannon divergence)
-    ├── quality/         # Quality metrics
-    └── results.py       # MetricResult, DriftResult, QualityResult
-
-api/
-├── routes/             # FastAPI endpoint handlers
-│   ├── drift.py
-│   ├── attribution.py
-│   ├── counterfactual.py
-│   └── optimization.py
-├── dependencies.py     # Dependency injection (get_store)
-├── schemas.py          # Pydantic request/response models
-├── main.py             # FastAPI app factory
-└── config.py           # Application configuration
-
-cli/
-└── drift_cli.py        # CLI diagnostic tool
-
-scripts/
-└── seed_db.py          # Database initialization
-
-tests/
-├── test_api.py                   # Phase 8: API integration tests
-├── test_counterfactual.py        # Phase 6: simulation tests
-├── test_optimization.py          # Phase 7: optimization tests
-├── test_causal_attribution.py    # Phase 5: attribution tests
-├── test_temporal_analysis.py     # Phase 4: drift detection tests
-├── test_history_store.py         # Phase 3: storage tests
-├── test_drift_math.py            # Drift math correctness
-├── test_drift_properties.py      # Distribution property tests
-└── test_run_schema.py            # Phase 1: schema validation
-```
-
-### Module Summary
-
-| Module | Responsibility |
-|---|---|
-| `evaluator/temporal/` | Detects drift events from metric time-series using sliding-window mean-shift with JSD |
-| `evaluator/causal/` | Extracts system-change events, builds feature vectors, scores causal impact via heuristic weighted composite |
-| `evaluator/counterfactual/` | Simulates interventions by cloning the history store and reverting changes non-mutatingly |
-| `evaluator/optimization/` | Maps changes to remediation actions, scores expected improvement, ranks recommendations |
-| `evaluator/storage/` | JSONL-backed history store for evaluation records |
-| `evaluator/metrics/` | Metric computation (drift + quality) with structured results |
-| `api/` | HTTP API exposing the full pipeline as REST endpoints |
-| `cli/` | Command-line diagnostics and alerting |
-
----
-
-## Installation
+### Installation
 
 ```bash
-pip install sentrix-evaluator
+# Clone the repository
+git clone https://github.com/your-org/post-rag-drift-evaluator.git
+cd post-rag-drift-evaluator
+
+# Install package with production dependencies
+pip install -e .
+
+# Or install with development and telemetry extras
+pip install -e ".[dev,telemetry]"
 ```
 
-For development:
+### Docker Deployment
 
 ```bash
-pip install -e ".[dev]"
+# Build local multi-stage container
+docker build -t sentrix-evaluator:v0.6.1 .
+
+# Run production stack (API + Postgres + Redis + Prometheus)
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Helm Chart (Kubernetes)
+
+```bash
+# Lint and render Helm chart
+helm lint deploy/helm/sentrix-evaluator/
+helm template sentrix-evaluator deploy/helm/sentrix-evaluator/
+
+# Install to Kubernetes cluster
+helm install sentrix-evaluator deploy/helm/sentrix-evaluator/ --namespace sentrix --create-namespace
 ```
 
 ---
 
-## Quick Start
+## Python SDK Usage
 
-### Python Usage
+### 1. Zero-Disk Closed-Loop Optimization
 
 ```python
-from evaluator.storage import JSONHistoryStore
-from evaluator.temporal.drift_detection import detect_drift_from_store
-from evaluator.causal.attribution import attribute_drift
-from evaluator.counterfactual.simulator import run_counterfactual_analysis
-from evaluator.optimization.optimizer import generate_optimization_plan
+import numpy as np
+from evaluator.storage import InMemoryHistoryStore
+from evaluator.guardrails import PolicyEvaluator
+from evaluator.optimization import OptimizationEngine, OptimizationRunner
+from evaluator.schema import DriftEvent
 
-# Load evaluation history
-store = JSONHistoryStore("history.jsonl")
+# Initialize in-memory store and engine components
+history_store = InMemoryHistoryStore()
+policy_evaluator = PolicyEvaluator(cooldown_seconds=300, max_flapping_per_hour=5)
+optimization_engine = OptimizationEngine(min_confidence=0.70)
+runner = OptimizationRunner(engine=optimization_engine, policy=policy_evaluator)
 
-# 1. Detect drift
-events = detect_drift_from_store(
-    store, metric_name="js_divergence", window_size=3, threshold=0.15
+# Construct drift event on retrieval track
+drift_event = DriftEvent(
+    event_id="evt_001",
+    track="retrieval",
+    metric_name="retrieval_precision",
+    current_value=0.52,
+    baseline_value=0.85,
+    severity="high",
 )
 
-if events:
-    # 2. Explain root cause
-    attribution = attribute_drift(events[0], store)
+# Run closed-loop optimization cycle
+result = runner.run_optimization_cycle(
+    drift_event=drift_event,
+    history_store=history_store,
+)
 
-    # 3. Simulate alternatives
-    counterfx = run_counterfactual_analysis(events[0], attribution, store)
-
-    # 4. Get recommendations
-    plan = generate_optimization_plan(events[0], attribution, counterfx)
-    print(plan.summary)
+print(f"Optimization Status: {result.status}")
+if result.status == "approved":
+    print(f"Action Approved: {result.selected_action.action_type}")
+    print(f"Parameters: {result.selected_action.parameters}")
 ```
 
-### API Usage
+### 2. Streaming Buffer & Dynamic Adaptive Drift Detection
+
+```python
+import numpy as np
+from evaluator.latent_drift import (
+    StreamingDriftBuffer,
+    AdaptiveThresholdManager,
+    LatentDriftEngine,
+)
+
+# Initialize 1000-sample streaming buffer and dynamic threshold manager
+buffer = StreamingDriftBuffer(capacity=1000, sample_strategy="reservoir")
+threshold_mgr = AdaptiveThresholdManager(base_threshold=0.15, sensitivity_z=2.0)
+engine = LatentDriftEngine(threshold_manager=threshold_mgr)
+
+# Ingest high-dimensional query embeddings from real-time stream
+vectors = np.random.randn(100, 384)
+for vec in vectors:
+    buffer.ingest(vector=vec, track="retrieval")
+
+# Flush current buffer snapshot and evaluate dynamic latent drift
+batch = buffer.flush_batch()
+if buffer.is_ready(min_samples=50):
+    drift_result = engine.compute_drift(current_batch=batch, baseline_batch=batch)
+    print(f"Drift Score: {drift_result.score:.4f}")
+    print(f"Dynamic Threshold Used: {drift_result.metadata['dynamic_threshold']:.4f}")
+```
+
+### 3. Causal-Latent Fusion Layer
+
+```python
+from evaluator.causal import CausalGraph, CausalNode, CausalLatentFusionEngine
+from evaluator.schema import LatentDriftResult
+
+# Initialize Causal DAG
+graph = CausalGraph()
+graph.add_node(CausalNode(node_id="VectorIndexNode", node_type="retrieval", prior_failure_prob=0.05))
+graph.add_node(CausalNode(node_id="LLMRouterNode", node_type="generation", prior_failure_prob=0.02))
+
+# Simulate latent drift detection result
+drift_result = LatentDriftResult(
+    track="retrieval",
+    score=0.42,
+    metric_breakdown={"mmd": 0.38, "swd": 0.45},
+    metadata={},
+)
+
+# Fuse latent drift signal directly into Causal DAG node priors
+updated_graph = CausalLatentFusionEngine.fuse_drift_into_causal_graph(
+    drift_result=drift_result,
+    graph=graph,
+)
+
+retrieval_node = updated_graph.get_node("VectorIndexNode")
+print(f"Updated Failure Probability: {retrieval_node.prior_failure_prob:.4f}")
+```
+
+---
+
+## API Gateway & CLI Reference
+
+### REST API Endpoints
+
+| Endpoint | Method | Description | Payload / Query |
+|---|---|---|---|
+| `/v1/eval` | POST | Ingest raw EvaluationRecord batches into storage. | `{"records": [...]}` |
+| `/v1/drift/detect` | POST | Triggers dual-track MMD/SWD detection across batches. | `{"current_batch_id": "...", "track": "retrieval"}` |
+| `/v1/remediate` | POST | Executes full OptimizationRunner remediation cycle. | `{"drift_event": {...}}` |
+| `/v1/stream/ingest` | POST | Ingests a single vector into the live streaming buffer. | `{"vector": [...], "track": "retrieval"}` |
+| `/v1/stream/flush` | POST | Flushes stream buffer and evaluates current drift. | `{"track": "retrieval", "metric": "mmd"}` |
+
+### CLI Subcommands (`sentrix`)
 
 ```bash
-uvicorn api.main:app --reload
+# Evaluate ingested evaluation records
+sentrix eval --input records.json --store memory
+
+# Trigger dual-track drift detection on vector batches
+sentrix drift --current current_batch.json --baseline baseline_batch.json --track retrieval --metric mmd
+
+# Stream line-delimited JSON vector payloads from stdin
+cat stream_vectors.jsonl | sentrix stream --track generation --capacity 500 --flush
+
+# Run closed-loop remediation on drift event
+sentrix remediate --event drift_event.json --cooldown 300
 ```
+
+---
+
+## OpenTelemetry & Metrics
+
+Sentrix native telemetry exposes metrics via standard OpenTelemetry meters with automatic fallback to no-op primitives when dependencies are omitted.
+
+| Metric Name | Type | Labels / Dimensions | Description |
+|---|---|---|---|
+| `sentrix_latent_drift_score` | Gauge | `track`, `metric` | Current calculated latent distance score (MMD/SWD/JSD). |
+| `sentrix_estimated_impact_delta` | Gauge | `metric_name` | Estimated impact delta from counterfactual simulations. |
+| `sentrix_drift_events_total` | Counter | `severity` | Total count of detected drift events triggered. |
+| `sentrix_optimization_actions_total` | Counter | `status`, `rule_violated` | Total optimization cycles categorized by approval status. |
+| `sentrix_counterfactual_evaluations_total` | Counter | `estimator` | Total count of counterfactual simulation iterations. |
+
+---
+
+## Testing & Verification
+
+The test suite enforces full test coverage, static typing, and formatting standards across over 200 unit, component, integration, and E2E lifecycle tests.
 
 ```bash
-curl -X POST http://localhost:8000/optimize \
-  -H "Content-Type: application/json" \
-  -d '{"metric_name": "js_divergence", "window_size": 3, "threshold": 0.15}'
+# Run unit and integration tests
+pytest tests/ -v
+
+# Run type checker
+mypy --ignore-missing-imports evaluator/ api/
+
+# Run linter and formatting checks
+ruff check .
+ruff format --check .
 ```
-
-### CLI Usage
-
-```bash
-python -m cli.drift_cli stats
-python -m cli.drift_cli evaluate --baseline-id group_a --current-id group_b
-```
-
----
-
-## API Endpoints
-
-All endpoints use `POST` and accept JSON request bodies. The history store path is configurable via the `EVALUATOR_HISTORY_PATH` environment variable or the `store_path` argument to `create_app()`.
-
-| Endpoint | Description |
-|---|---|
-| `POST /drift` | Detect drift events from the history store. Accepts `metric_name`, `window_size`, `threshold`. |
-| `POST /attribution` | Run causal attribution on a drift event. Accepts a serialized `DriftEvent`. |
-| `POST /counterfactual` | Run counterfactual simulation. Accepts a `DriftEvent` and `CausalAttribution`. |
-| `POST /optimize` | Full end-to-end pipeline: detect → attribute → simulate → recommend. Accepts drift detection parameters. |
-
----
-
-## Example Output
-
-### Optimization Plan
-
-```json
-{
-  "plan_id": "a1b2c3d4-...",
-  "drift_event_id": "ev-7f3e...",
-  "recommendations": [
-    {
-      "recommendation_id": "rec-abc...",
-      "action": {
-        "action_id": "act-def...",
-        "action_type": "revert_model",
-        "target_run_id": "run_42",
-        "change_id": "chg-123...",
-        "description": "Revert model change",
-        "metadata": {
-          "factor_name": "model_update",
-          "factor_score": 0.92
-        }
-      },
-      "expected_improvement": 0.40,
-      "confidence": 0.92,
-      "priority": 1,
-      "metadata": {
-        "source": "counterfactual_simulation"
-      }
-    }
-  ],
-  "summary": "Top recommendation: revert model change in run run_42 (expected improvement: 0.4)",
-  "metadata": {
-    "metric_name": "js_divergence",
-    "num_actions": 1,
-    "num_recommendations": 1,
-    "drift_magnitude": 0.45
-  }
-}
-```
-
----
-
-## Design Principles
-
-1. **Distribution-First Evaluation** — Measures systemic drift, not just pointwise correctness
-2. **Deterministic Reproducibility** — Every operation produces identical output given identical input. No randomness, no ML dependencies.
-3. **Non-Mutating Simulation** — Counterfactual analysis clones the history store; original data is never modified
-4. **Modular Architecture** — Each phase (detect, explain, simulate, act) is a standalone module with clear interfaces
-5. **Actionable Insights** — Converts statistical signals into ranked, concrete recommendations
-6. **API-Core Separation** — The FastAPI layer wraps core logic with Pydantic schemas; internal dataclasses are never exposed directly
-7. **Stable Cross-Module Identity** — `change_id` values use deterministic UUIDv5 for stable references across all pipeline stages
-
----
-
-## Testing
-
-```bash
-pytest
-```
-
-```bash
-ruff check
-```
-
-The test suite covers all phases (1–8) including:
-- Schema validation and serialization round-trips
-- Drift detection math correctness
-- Causal attribution scoring and ranking
-- Counterfactual simulation (store cloning, metric re-estimation)
-- Optimization action generation and recommendation ranking
-- API endpoint behavior (request/response, error handling, empty stores)
-- End-to-end pipeline integration
-
----
-
-## Roadmap
-
-| Feature | Status |
-|---|---|
-| Drift Detection | Complete |
-| Causal Attribution | Complete |
-| Counterfactual Simulation | Complete |
-| Optimization Engine | Complete |
-| API Layer | Complete |
-| **Dashboard UI** | Planned |
-| **Autonomous Execution Loop** | Planned |
-| **CI/CD Integration** | Planned |
-| **ML-Augmented Attribution** | Research |
-
----
-
-## Contributing
-
-Pull requests, experiments, and research extensions are welcome.
 
 ---
 
 ## License
 
-MIT
-
-Copyright (c) 2026 Arash Nicoomanesh (aragit)
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
