@@ -35,6 +35,11 @@ class EvaluatorConfig(BaseSettings):
     MMD_THRESHOLD: float = Field(default=0.1)
     PER_COMPONENT_KL_THRESHOLD: float = Field(default=0.5)
 
+    LATENT_DRIFT_ENABLED: bool = Field(default=True)
+    LATENT_DRIFT_THRESHOLD: float = Field(default=0.15)
+    PCA_COMPONENTS: int = Field(default=5)
+    KDE_SAMPLE_SIZE: int = Field(default=1000)
+
     DEFAULT_BASELINE_WINDOW_HOURS: int = Field(default=24)
     DYNAMIC_THRESHOLD_K_SIGMA: float = Field(default=2.0)
     MIN_BASELINE_FRAMES: int = Field(default=20)
