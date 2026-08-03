@@ -7,7 +7,7 @@ import polars as pl
 from evaluator.logging_config import get_logger, setup_logging
 from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.rag_pipelines.naive_rag import NaiveRAG
-from evaluator.utils.metrics import evaluate_context_precision, evaluate_faithfulness
+from evaluator.utils.metrics import evaluate_all_from_run
 
 setup_logging()
 logger = get_logger("BenchmarkHarness")
@@ -27,13 +27,13 @@ async def run_benchmark(queries: list[str]) -> pl.DataFrame:
             response = await pipeline.execute(query)
             latency = time.time() - start_time
 
+            # Canonical model — all downstream modules consume RAGRun
+            run = response.to_ragrun()
+
             # Evaluate using LLM-as-a-Judge
-            faithfulness = evaluate_faithfulness(
-                response.query, response.retrieved_contexts, response.generated_answer
-            )
-            precision = evaluate_context_precision(
-                response.query, response.retrieved_contexts
-            )
+            scores = evaluate_all_from_run(run)
+            faithfulness = scores["faithfulness"]
+            precision = scores["context_precision"]
 
             results.append(
                 {
@@ -42,7 +42,7 @@ async def run_benchmark(queries: list[str]) -> pl.DataFrame:
                     "Context Precision": precision,
                     "Faithfulness": faithfulness,
                     "Latency (s)": round(latency, 2),
-                    "Tokens": response.metadata.get("token_usage", {}).get(
+                    "Tokens": run.metadata.get("token_usage", {}).get(
                         "total_tokens", 0
                     ),
                 }

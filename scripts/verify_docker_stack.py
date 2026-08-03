@@ -27,6 +27,9 @@ import time
 from typing import Any
 
 import httpx
+import numpy as np
+
+from ingestion.run_schema import RAGRun
 
 # ── Docker environment ──────────────────────────────────────────────────
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -90,8 +93,37 @@ def make_frame(
     }
 
 
+def make_ragrun(idx: int, embedding_dim: int = 8, seed: int | None = None) -> RAGRun:
+    """Build a canonical :class:`RAGRun` from the same test data as :func:`make_frame`."""
+    rng = random.Random(seed if seed is not None else idx)
+    embedding = [rng.gauss(0, 1) for _ in range(embedding_dim)]
+    embedding_arr = np.asarray(embedding, dtype=float)
+    doc_a_emb = np.asarray([rng.gauss(0, 1) for _ in range(embedding_dim)], dtype=float)
+    doc_b_emb = np.asarray([rng.gauss(0, 1) for _ in range(embedding_dim)], dtype=float)
+    return RAGRun(
+        query=f"question_{idx}",
+        retrieved_docs=[f"chunk_{idx}_a", f"chunk_{idx}_b"],
+        retrieved_doc_ids=[f"doc_{idx}_a", f"doc_{idx}_b"],
+        retrieved_embeddings=[doc_a_emb, doc_b_emb],
+        query_embedding=embedding_arr,
+        answer=f"answer_{idx}",
+        answer_embedding=embedding_arr,
+        metadata={
+            "rag_type": "agentic",
+            "agent_hops": ["retriever", "reader", "retriever"],
+            "reflection_iterations": 1,
+            "latency_ms": 120.0 + idx,
+            "confidence_score": 0.85 + idx * 0.01,
+        },
+    )
+
+
 def make_frame_batch(n: int) -> list[dict[str, Any]]:
     return [make_frame(i, seed=42 + i) for i in range(n)]
+
+
+def make_ragrun_batch(n: int) -> list[RAGRun]:
+    return [make_ragrun(i, seed=42 + i) for i in range(n)]
 
 
 # ── Docker management ───────────────────────────────────────────────────

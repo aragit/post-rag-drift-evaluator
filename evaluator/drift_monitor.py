@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import polars as pl
@@ -15,6 +17,9 @@ from evaluator.drift_store import DriftStore
 from evaluator.logging_config import get_logger
 from evaluator.schemas.telemetry import RAGEvaluationFrame
 
+if TYPE_CHECKING:
+    from ingestion.run_schema import RAGRun
+
 logger = get_logger("DriftMonitor")
 
 
@@ -24,7 +29,7 @@ class DriftMonitor:
         threshold: float = config.DRIFT_THRESHOLD,
         store: DriftStore | None = None,
         notifier: DriftAlertNotifier | None = None,
-        baseline_service: "DynamicBaselineService | None" = None,
+        baseline_service: DynamicBaselineService | None = None,
     ):
         self.threshold = threshold
         self.mmd_threshold = config.MMD_THRESHOLD
@@ -408,6 +413,28 @@ class DriftMonitor:
             return None
         return np.array(vectors, dtype=float)
 
+    @staticmethod
+    def _collect_vector_embeddings_from_runs(
+        runs: list[RAGRun],
+    ) -> np.ndarray | None:
+        """Extract embeddings from a list of :class:`RAGRun`.
+
+        Fallback order: query_embedding → answer_embedding →
+        retrieved_embeddings[0].
+        """
+        vectors = []
+        for run in runs:
+            embedding = run.query_embedding
+            if embedding is None:
+                embedding = run.answer_embedding
+            if embedding is None and run.retrieved_embeddings:
+                embedding = run.retrieved_embeddings[0]
+            if embedding is not None:
+                vectors.append(np.asarray(embedding, dtype=float))
+        if not vectors:
+            return None
+        return np.array(vectors, dtype=float)
+
     def _evaluate_vector_drift(
         self,
         baseline_frames: list[RAGEvaluationFrame],
@@ -420,6 +447,50 @@ class DriftMonitor:
         }
         baseline_vectors = self._collect_vector_embeddings(baseline_frames)
         current_vectors = self._collect_vector_embeddings(current_frames)
+        if (
+            baseline_vectors is None
+            or current_vectors is None
+            or baseline_vectors.shape[1] != current_vectors.shape[1]
+        ):
+            return result
+
+        baseline_df = pl.DataFrame({"embedding": baseline_vectors.tolist()})
+        current_df = pl.DataFrame({"embedding": current_vectors.tolist()})
+
+        js_score, js_drifted = self.compute_jensen_shannon_drift(
+            baseline_df, current_df, "embedding"
+        )
+        if len(baseline_vectors) < 2 or len(current_vectors) < 2:
+            mmd_score, mmd_drifted = 0.0, False
+        else:
+            mmd_score, _, mmd_drifted = self.compute_mmd_drift(
+                baseline_df, current_df, "embedding"
+            )
+
+        return {
+            "js_divergence": js_score,
+            "mmd_score": mmd_score,
+            "is_drifted": js_drifted or mmd_drifted,
+        }
+
+    def evaluate_vector_drift_between_runs(
+        self,
+        baseline_runs: list[RAGRun],
+        current_runs: list[RAGRun],
+    ) -> dict[str, Any]:
+        """Compute vector drift between two windows of :class:`RAGRun`.
+
+        Internally extracts embeddings from the runs and delegates to
+        :meth:`_evaluate_vector_drift`-equivalent logic that operates on
+        DataFrames and the existing JS / MMD drift methods.
+        """
+        result = {
+            "js_divergence": 0.0,
+            "mmd_score": 0.0,
+            "is_drifted": False,
+        }
+        baseline_vectors = self._collect_vector_embeddings_from_runs(baseline_runs)
+        current_vectors = self._collect_vector_embeddings_from_runs(current_runs)
         if (
             baseline_vectors is None
             or current_vectors is None
