@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     Counter,
@@ -21,15 +23,15 @@ INGESTION_BUFFER_DEPTH = Gauge(
 )
 
 EVALUATION_LATENCY_SECONDS = Histogram(
-    "evaluation_latency_seconds",
+    "sentrix_evaluation_duration_seconds",
     "Duration of multi-modal drift evaluation requests in seconds.",
     ["status"],
     buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0),
 )
 
 DRIFT_SCORE_GAUGE = Gauge(
-    "drift_score_gauge",
-    "Latest calculated drift metric value.",
+    "sentrix_drift_score",
+    "Latest calculated drift metric value per metric type (vector/graph/swarm).",
     ["metric_type"],
 )
 
@@ -54,7 +56,20 @@ sentrix_up.set(1.0)
 
 
 def render_metrics() -> bytes:
-    """Return the prometheus-formatted metrics payload as UTF-8 bytes."""
+    """Return the prometheus-formatted metrics payload as UTF-8 bytes.
+
+    In single-process mode (the default) this uses the default in-memory
+    registry.  In multi-worker deployments set the ``PROMETHEUS_MULTIPROC_DIR``
+    environment variable to a shared tmpfs directory so every worker
+    contributes to a single consolidated registry across processes.
+    """
+    multiproc_dir = os.getenv("PROMETHEUS_MULTIPROC_DIR")
+    if multiproc_dir:
+        from prometheus_client import CollectorRegistry, multiprocess
+
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry)
     return generate_latest()
 
 

@@ -79,6 +79,8 @@ spec:
               value: "8000"
             - name: HOST
               value: "0.0.0.0"
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: /tmp/prometheus-multiproc
           livenessProbe:
             httpGet:
               path: /health
@@ -102,6 +104,13 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
+          volumeMounts:
+            - name: prometheus-multiproc
+              mountPath: /tmp/prometheus-multiproc
+      volumes:
+        - name: prometheus-multiproc
+          emptyDir:
+            medium: Memory
       restartPolicy: Always
 
 ---
