@@ -463,7 +463,16 @@ python tests/smoke_test.py --url http://localhost:8000
 
 The next phase of development focuses on closing the feedback loop between telemetry monitoring and active agentic runtime control.
 
-┌────────────────────────────────────────────────────────────────────────────────────────┐│                                 AUTONOMOUS FEEDBACK LOOP                               ││                                                                                        ││  [Drift Signals (D_JS)] ──► [Causal Root-Cause DAG] ──► [Adaptive Test-Time Compute]   ││                                                                   │                    ││                                                                   ▼                    ││  [KV-Cache Eviction] ◄── [Dynamic OPA Policy Synthesis] ◄── [PRM Deliberation Depth]   │└────────────────────────────────────────────────────────────────────────────────────────┘
+```text
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                AUTONOMOUS FEEDBACK LOOP                                 │
+│                                                                                         │
+│  [Drift Signals (D_JS)] ──► [Causal Root-Cause DAG] ──► [Adaptive Test-Time Compute]  │
+│                                                                   │                       │
+│                                                                   ▼                       │
+│  [KV-Cache Eviction] ◄── [Dynamic Policy Synthesis] ◄── [PRM Deliberation Depth]      │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### 1. Closed-Loop Adaptive Test-Time Compute (TTC)
 
@@ -480,9 +489,9 @@ The next phase of development focuses on closing the feedback loop between telem
 * **eBPF-Native GPU/CUDA Telemetry Probes:** Replace HTTP/application-level metric exporters with zero-overhead eBPF probes tracking token streaming latency, CUDA kernel execution delays, and PCIe host-to-device memory transfer bottlenecks.
 * **Drift-Aware KV-Cache Eviction for vLLM-CCR:** Interface the `vLLM-CCR` router directly with `sentrix_drift_score` to selectively flush stale or drifted prefix states from the global Radix Tree cache, preserving KV-cache capacity for high-confidence prompt states.
 
-### 4. FastMCP 2.0 Streaming Control Plane
+### 4. Model Context Protocol (MCP) Streaming Control Plane
 
-* **Bi-Directional SSE/WebSocket Telemetry:** Upgrade the FastMCP server implementation to support full-duplex streaming events, enabling multi-agent orchestrators to subscribe directly to sub-10ms telemetry signals without poll overhead.
+* **Bi-Directional SSE/WebSocket Telemetry:** Upgrade the MCP server implementation to support full-duplex streaming events, enabling multi-agent orchestrators to subscribe directly to sub-10ms telemetry signals without poll overhead.
 
 ---
 
