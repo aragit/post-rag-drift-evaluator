@@ -302,57 +302,45 @@ sentrix remediate --event drift_event.json --cooldown 300
 
 ---
 
-## OpenTelemetry & Metrics
+## 📊 Telemetry & Observability Stack (OpenTelemetry + Prometheus + Grafana)
 
-Sentrix native telemetry exposes metrics via standard OpenTelemetry meters with automatic fallback to Prometheus HTTP exporter primitives.
-
-| Metric Name | Type | Labels / Dimensions | Description |
-|---|---|---|---|
-| `sentrix_up` | Gauge | _pid_ | Sentrix Evaluator API process status (1 = process is up and serving requests). |
-| `sentrix_evaluation_duration_seconds` | Histogram | `status` | Duration of multi-modal drift evaluation requests in seconds. |
-| `sentrix_drift_score` | Gauge | `metric_type` | Latest calculated drift metric value (vector/graph/swarm). |
-| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Total number of telemetry frames ingested via the HTTP API. |
-| `ingestion_buffer_depth` | Gauge | `buffer_type` | Current number of frames awaiting persistence in the ingestion buffer. |
-| `drift_alerts_total` | Counter | `status` | Total number of drift alerts dispatched (or attempted). |
-| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Latency of database batch write operations in seconds. |
-
-**Prometheus Discovery Annotations** (added to pod metadata for scrape auto-discovery):
-
-```yaml
-annotations:
-  prometheus.io/scrape: "true"
-  prometheus.io/path: "/metrics"
-  prometheus.io/port: "8000"
-```
+Sentrix native telemetry exposes operational metrics via standard OpenTelemetry meters with automatic fallbacks to Prometheus HTTP exporter primitives. The repository includes a zero-click Docker setup with pre-configured scrape targets and auto-provisioned Grafana dashboards (`dashboards/grafana-sentrix-overview.json`).
 
 ---
 
-## 📊 Local Observability & Telemetry Stack (Zero-Click)
+### 🚀 Zero-Click Quick Start
 
-This repository includes a pre-configured Prometheus scrape configuration and auto-provisioned Grafana dashboard (`dashboards/grafana-sentrix-overview.json`) for real-time drift telemetry, evaluation latency tracking, and system health metrics.
-
----
-
-### 🚀 Quick Start (Zero-Click Setup)
-
-Launch the entire telemetry stack with auto-configured data sources and pre-loaded dashboards:
+Launch the monitoring control plane with pre-loaded dashboards and data sources:
 
 ```bash
-# 1. Start Prometheus & Grafana with provisioning
+# 1. Start Prometheus & Grafana with auto-provisioning
 docker compose up -d
 
 # 2. Stream live synthetic telemetry metrics
 python scripts/stream_metrics.py
 ```
 
-Access the dashboard immediately at **http://localhost:3000**
-(Credentials: Username `admin` | Password `visdrift` — Dashboard is auto-provisioned on start)
+Access Grafana at http://localhost:3000 (Credentials: `admin` / `visdrift` — Dashboard is auto-provisioned on startup)
+
+---
+
+### ☸️ Kubernetes Auto-Discovery & Pod Annotations
+
+For Kubernetes deployment topologies, add these annotations to pod metadata to enable Prometheus scrape auto-discovery:
+
+```yaml
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "8000"
+```
 
 ---
 
 ### ⚙️ Manual Container Execution (Alternative)
 
-If running containers individually without Docker Compose:
+If executing container instances individually without Docker Compose:
 
 ```bash
 # Launch Prometheus
@@ -369,23 +357,21 @@ docker run -d --name grafana -p 3000:3000 \
   grafana/grafana
 ```
 
-### Cross-Platform Note
-
-Docker Desktop (macOS/Windows) automatically resolves `host.docker.internal`. Native Linux environments rely on the `--add-host=host.docker.internal:host-gateway` flag included in the compose configuration.
+Cross-Platform Note: Docker Desktop (macOS/Windows) automatically resolves `host.docker.internal`. Native Linux environments utilize the `--add-host=host.docker.internal:host-gateway` flag defined in `docker-compose.yml`.
 
 ---
 
-### 📈 Exposed Telemetry Metrics
+### 📈 Exposed Telemetry Metrics Reference
 
-| Metric Name | Type | Labels | Description |
+| Metric Name | Type | Labels / Dimensions | Description |
 |---|---|---|---|
-| `sentrix_up` | Gauge | _pid_ | Process status (1 = running, 0 = down). |
-| `sentrix_drift_score` | Gauge | `metric_type` | Real-time drift score per type (vector_jsd, graph, swarm). |
-| `sentrix_evaluation_duration_seconds` | Histogram | `status` | Drift evaluation request latency profile (P50 / P95 / P99). |
-| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Total telemetry frames ingested via HTTP API. |
-| `ingestion_buffer_depth` | Gauge | `buffer_type` | Ingestion queue buffer depth awaiting persistence. |
+| `sentrix_up` | Gauge | _pid_ | Evaluator API process status (1 = running, 0 = down). |
+| `sentrix_drift_score` | Gauge | `metric_type` | Real-time calculated drift metric score (vector_jsd, graph, swarm). |
+| `sentrix_evaluation_duration_seconds` | Histogram | `status` | Multi-modal drift evaluation latency profile (P50 / P95 / P99). |
+| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Total telemetry frames ingested via the HTTP API. |
+| `ingestion_buffer_depth` | Gauge | `buffer_type` | Ingestion queue depth awaiting persistence. |
 | `drift_alerts_total` | Counter | `status` | Total drift alerts dispatched by the governance gate. |
-| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Latency profile for database batch writes. |
+| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Latency profile for database batch write operations. |
 
 ---
 
