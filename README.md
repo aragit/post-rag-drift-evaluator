@@ -323,6 +323,60 @@ annotations:
 
 ---
 
+## Local Observability Stack (Prometheus + Grafana)
+
+The repository includes a `prometheus.yml` and a pre-built Grafana dashboard (`dashboards/grafana-sentrix-overview.json`) for local monitoring of drift metrics.
+
+### Quick Start
+
+```bash
+# 1. Start Prometheus and Grafana locally
+docker run -d --name prometheus -p 9090:9090 \
+  -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+
+docker run -d --name grafana -p 3000:3000 \
+  -e "GF_SECURITY_ADMIN_PASSWORD=visdrift" grafana/grafana
+
+# 2. Log in to Grafana at http://localhost:3000
+#    Username: admin | Password: visdrift
+#    (Change the password on first login if desired.)
+
+# 3. Add Prometheus data source in Grafana:
+#    Connection name: Sentrix-Prometheus
+#    Server URL: http://host.docker.internal:9090
+
+# 4. Import dashboard: dashboards/grafana-sentrix-overview.json
+
+# 5. (Optional) Stream live synthetic metrics:
+python scripts/stream_metrics.py
+```
+
+### Cross-Platform Notes
+
+**Linux:** Grafana and Prometheus containers cannot resolve `host.docker.internal` by default. Use the `--add-host=host.docker.internal:host-gateway` flag:
+
+```bash
+docker run -d --name grafana -p 3000:3000 \
+  --add-host=host.docker.internal:host-gateway \
+  -e "GF_SECURITY_ADMIN_PASSWORD=visdrift" grafana/grafana
+```
+
+**macOS / Windows (Docker Desktop):** `host.docker.internal` resolves automatically; no `--add-host` flag needed.
+
+### Available Metrics
+
+| Metric Name | Type | Labels | Description |
+|---|---|---|---|
+| `sentrix_up` | Gauge | _pid_ | Process status (1 = running). |
+| `sentrix_evaluation_duration_seconds` | Histogram | `status` | Drift evaluation request latency. |
+| `sentrix_drift_score` | Gauge | `metric_type` | Latest drift score per metric type (vector/graph/swarm). |
+| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Frames ingested via the HTTP API. |
+| `ingestion_buffer_depth` | Gauge | `buffer_type` | Frames awaiting persistence. |
+| `drift_alerts_total` | Counter | `status` | Drift alerts dispatched. |
+| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Database batch write latency. |
+
+---
+
 ## Quickstart
 
 ### Installation
