@@ -467,10 +467,10 @@ The next phase of development focuses on closing the feedback loop between telem
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                                AUTONOMOUS FEEDBACK LOOP                                 │
 │                                                                                         │
-│  [Drift Signals (D_JS)] ──► [Causal Root-Cause DAG] ──► [Adaptive Test-Time Compute]  │
-│                                                                   │                       │
-│                                                                   ▼                       │
-│  [KV-Cache Eviction] ◄── [Dynamic Policy Synthesis] ◄── [PRM Deliberation Depth]      │
+│  [Drift Signals (D_JS)] ──► [Causal Root-Cause DAG] ──► [Adaptive Test-Time Compute]    │
+│                                                                   │                     │
+│                                                                   ▼                     │
+│  [KV-Cache Eviction] ◄── [Dynamic Policy Synthesis] ◄── [PRM Deliberation Depth]        │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
