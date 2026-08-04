@@ -327,45 +327,65 @@ annotations:
 
 ---
 
-## Local Observability Stack (Prometheus + Grafana)
+## 📊 Local Observability & Telemetry Stack (Zero-Click)
 
-The repository includes a `prometheus.yml` and a pre-built Grafana dashboard (`dashboards/grafana-sentrix-overview.json`) for local monitoring of drift metrics.
+This repository includes a pre-configured Prometheus scrape configuration and auto-provisioned Grafana dashboard (`dashboards/grafana-sentrix-overview.json`) for real-time drift telemetry, evaluation latency tracking, and system health metrics.
 
-### Quick Start
+---
+
+### 🚀 Quick Start (Zero-Click Setup)
+
+Launch the entire telemetry stack with auto-configured data sources and pre-loaded dashboards:
 
 ```bash
-# 1. Start Prometheus and Grafana locally
-docker run -d --name prometheus -p 9090:9090 \
-  -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+# 1. Start Prometheus & Grafana with provisioning
+docker compose up -d
 
-docker run -d --name grafana -p 3000:3000 \
-  -e "GF_SECURITY_ADMIN_PASSWORD=visdrift" grafana/grafana
-
-# 2. Log in to Grafana at http://localhost:3000
-#    Username: admin | Password: visdrift
-#    (Change the password on first login if desired.)
-
-# 3. Add Prometheus data source in Grafana:
-#    Connection name: Sentrix-Prometheus
-#    Server URL: http://host.docker.internal:9090
-
-# 4. Import dashboard: dashboards/grafana-sentrix-overview.json
-
-# 5. (Optional) Stream live synthetic metrics:
+# 2. Stream live synthetic telemetry metrics
 python scripts/stream_metrics.py
 ```
 
-### Cross-Platform Notes
+Access the dashboard immediately at **http://localhost:3000**
+(Credentials: Username `admin` | Password `visdrift` — Dashboard is auto-provisioned on start)
 
-**Linux:** Grafana and Prometheus containers cannot resolve `host.docker.internal` by default. Use the `--add-host=host.docker.internal:host-gateway` flag:
+---
+
+### ⚙️ Manual Container Execution (Alternative)
+
+If running containers individually without Docker Compose:
 
 ```bash
+# Launch Prometheus
+docker run -d --name prometheus -p 9090:9090 \
+  -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
+  prom/prometheus
+
+# Launch Grafana (Linux requires host gateway flag)
 docker run -d --name grafana -p 3000:3000 \
   --add-host=host.docker.internal:host-gateway \
-  -e "GF_SECURITY_ADMIN_PASSWORD=visdrift" grafana/grafana
+  -e "GF_SECURITY_ADMIN_PASSWORD=visdrift" \
+  -v $(pwd)/grafana/provisioning:/etc/grafana/provisioning \
+  -v $(pwd)/dashboards:/var/lib/grafana/dashboards \
+  grafana/grafana
 ```
 
-**macOS / Windows (Docker Desktop):** `host.docker.internal` resolves automatically; no `--add-host` flag needed.
+### Cross-Platform Note
+
+Docker Desktop (macOS/Windows) automatically resolves `host.docker.internal`. Native Linux environments rely on the `--add-host=host.docker.internal:host-gateway` flag included in the compose configuration.
+
+---
+
+### 📈 Exposed Telemetry Metrics
+
+| Metric Name | Type | Labels | Description |
+|---|---|---|---|
+| `sentrix_up` | Gauge | _pid_ | Process status (1 = running, 0 = down). |
+| `sentrix_drift_score` | Gauge | `metric_type` | Real-time drift score per type (vector_jsd, graph, swarm). |
+| `sentrix_evaluation_duration_seconds` | Histogram | `status` | Drift evaluation request latency profile (P50 / P95 / P99). |
+| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Total telemetry frames ingested via HTTP API. |
+| `ingestion_buffer_depth` | Gauge | `buffer_type` | Ingestion queue buffer depth awaiting persistence. |
+| `drift_alerts_total` | Counter | `status` | Total drift alerts dispatched by the governance gate. |
+| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Latency profile for database batch writes. |
 
 ---
 
