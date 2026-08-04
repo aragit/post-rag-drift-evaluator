@@ -311,6 +311,10 @@ Sentrix native telemetry exposes metrics via standard OpenTelemetry meters with 
 | `sentrix_up` | Gauge | _pid_ | Sentrix Evaluator API process status (1 = process is up and serving requests). |
 | `sentrix_evaluation_duration_seconds` | Histogram | `status` | Duration of multi-modal drift evaluation requests in seconds. |
 | `sentrix_drift_score` | Gauge | `metric_type` | Latest calculated drift metric value (vector/graph/swarm). |
+| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Total number of telemetry frames ingested via the HTTP API. |
+| `ingestion_buffer_depth` | Gauge | `buffer_type` | Current number of frames awaiting persistence in the ingestion buffer. |
+| `drift_alerts_total` | Counter | `status` | Total number of drift alerts dispatched (or attempted). |
+| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Latency of database batch write operations in seconds. |
 
 **Prometheus Discovery Annotations** (added to pod metadata for scrape auto-discovery):
 
@@ -362,18 +366,6 @@ docker run -d --name grafana -p 3000:3000 \
 ```
 
 **macOS / Windows (Docker Desktop):** `host.docker.internal` resolves automatically; no `--add-host` flag needed.
-
-### Available Metrics
-
-| Metric Name | Type | Labels | Description |
-|---|---|---|---|
-| `sentrix_up` | Gauge | _pid_ | Process status (1 = running). |
-| `sentrix_evaluation_duration_seconds` | Histogram | `status` | Drift evaluation request latency. |
-| `sentrix_drift_score` | Gauge | `metric_type` | Latest drift score per metric type (vector/graph/swarm). |
-| `frame_ingestion_total` | Counter | `status`, `buffer_type` | Frames ingested via the HTTP API. |
-| `ingestion_buffer_depth` | Gauge | `buffer_type` | Frames awaiting persistence. |
-| `drift_alerts_total` | Counter | `status` | Drift alerts dispatched. |
-| `db_batch_write_latency_seconds` | Histogram | _(none)_ | Database batch write latency. |
 
 ---
 
