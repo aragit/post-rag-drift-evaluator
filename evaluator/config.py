@@ -29,7 +29,6 @@ class EvaluatorConfig(BaseSettings):
     DB_POOL_MAX_SIZE: int = Field(default=10)
     DB_POOL_MAX_QUERIES: int = Field(default=50000)
     MAX_REFLECTION_ITERATIONS: int = Field(default=2)
-    METRICS_PORT: int = Field(default=8000)
 
     DRIFT_THRESHOLD: float = Field(default=0.15)
     MMD_THRESHOLD: float = Field(default=0.1)

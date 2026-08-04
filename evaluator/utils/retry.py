@@ -38,3 +38,24 @@ def _retry_litellm(func: F) -> F:
 def call_with_retry(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     """Call a litellm function with retry logic for transient API errors."""
     return _retry_litellm(func)(*args, **kwargs)
+
+
+async def async_call_with_retry(
+    func: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Any:
+    """Call an *async* litellm function with retry logic for transient API errors.
+
+    Uses tenacity's async retry semantics so ``litellm.acompletion`` /
+    ``litellm.aembedding`` never block the event loop across retries.
+    """
+
+    @retry(
+        retry=retry_if_exception_type(_RETRYABLE_EXCEPTIONS),
+        stop=stop_after_attempt(3) | stop_after_delay(30),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _async_wrapper() -> Any:
+        return await func(*args, **kwargs)
+
+    return await _async_wrapper()

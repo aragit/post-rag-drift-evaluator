@@ -3,11 +3,21 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from evaluator.schemas.telemetry import RAGEvaluationFrame
+
 SCHEMA_VERSION = "1.0"
+
+_RAG_TYPE_MAP: dict[str, str] = {
+    "naive": "naive",
+    "agentic": "agentic",
+    "graph": "graph_rag",
+    "swarm": "swarm",
+}
 
 
 @dataclass
@@ -162,3 +172,87 @@ class RAGRun:
             "timestamp": self.timestamp,
             "system_version": self.system_version,
         }
+
+    def to_evaluation_frame(
+        self, scores: dict[str, float] | None = None
+    ) -> RAGEvaluationFrame:
+        """Bridge this canonical :class:`RAGRun` into a unified telemetry frame.
+
+        All ``np.ndarray`` attributes (``query_embedding``,
+        ``retrieved_embeddings``, ``answer_embedding``) are coerced to native
+        ``list[float]`` so the resulting frame is JSON / Postgres JSONB /
+        Redis Streams serializable without NumPy type errors.
+
+        Computed ``scores`` (e.g. faithfulness, context precision) are folded
+        into the execution metadata's ``extra`` bag for downstream drift
+        monitoring and dashboarding.
+        """
+        from datetime import datetime, timezone
+
+        from evaluator.schemas.telemetry import (
+            ExecutionMetadataPayload,
+            OutputPayload,
+            QueryPayload,
+            RAGEvaluationFrame,
+            RetrievalContextPayload,
+        )
+
+        scores = scores or {}
+
+        name = ""
+        if self.system_info is not None:
+            name = self.system_info.name or ""
+        rag_type = _RAG_TYPE_MAP.get(name.lower().removesuffix("rag"), "custom")
+
+        timestamp = self.timestamp
+        frame_ts = (
+            datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            if timestamp is not None
+            else datetime.now(timezone.utc)
+        )
+
+        return RAGEvaluationFrame(
+            trace_id=self.run_id or str(uuid.uuid4()),
+            timestamp=frame_ts,
+            query=QueryPayload(
+                text=self.query,
+                embedding=(
+                    self.query_embedding.tolist()
+                    if self.query_embedding is not None
+                    else None
+                ),
+            ),
+            context=RetrievalContextPayload(
+                text_chunks=list(self.retrieved_docs),
+                dense_embeddings=(
+                    [e.tolist() for e in self.retrieved_embeddings]
+                    if self.retrieved_embeddings is not None
+                    else None
+                ),
+            ),
+            metadata=ExecutionMetadataPayload(
+                rag_type=rag_type,
+                reflection_iterations=int(
+                    self.metadata.get("reflection_iterations", 0) or 0
+                ),
+                agent_hops=self.metadata.get("agent_hops"),
+                latency_ms=self.metadata.get("latency_ms"),
+                extra={
+                    **scores,
+                    "token_usage": self.metadata.get("token_usage", {}),
+                },
+            ),
+            output=OutputPayload(
+                generated_answer=self.answer or "",
+                response_embedding=(
+                    self.answer_embedding.tolist()
+                    if self.answer_embedding is not None
+                    else None
+                ),
+                confidence_score=(
+                    float(self.metadata["final_confidence"])
+                    if self.metadata.get("final_confidence")
+                    else None
+                ),
+            ),
+        )

@@ -4,6 +4,7 @@ import time
 
 import polars as pl
 
+from evaluator.drift_store import DriftStore
 from evaluator.logging_config import get_logger, setup_logging
 from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.rag_pipelines.naive_rag import NaiveRAG
@@ -15,6 +16,7 @@ logger = get_logger("BenchmarkHarness")
 
 async def run_benchmark(queries: list[str]) -> pl.DataFrame:
     pipelines = {"NaiveRAG": NaiveRAG(), "AgenticRAG": AgenticRAG()}
+    drift_store = DriftStore()
 
     results = []
 
@@ -29,6 +31,16 @@ async def run_benchmark(queries: list[str]) -> pl.DataFrame:
 
             # Canonical model — all downstream modules consume RAGRun
             run = response.to_ragrun()
+
+            # Validate before evaluation; skip invalid runs gracefully rather
+            # than crashing the entire benchmark iteration loop.
+            try:
+                run.validate()
+            except ValueError as exc:
+                logger.warning(
+                    "Skipping invalid run for query %r: %s", query, exc
+                )
+                continue
 
             # Evaluate using LLM-as-a-Judge
             scores = evaluate_all_from_run(run)
@@ -47,6 +59,23 @@ async def run_benchmark(queries: list[str]) -> pl.DataFrame:
                     ),
                 }
             )
+
+            # Bridge to the canonical telemetry frame and persist for
+            # dashboard consumption. Persistence failures (e.g. no live
+            # PostgreSQL) must never abort the benchmark run.
+            frame = run.to_evaluation_frame(scores)
+            metrics = {
+                **scores,
+                "latency_ms": round(latency * 1000, 2),
+            }
+            try:
+                await drift_store.record_evaluation(frame, metrics)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to persist evaluation frame for run %s: %s",
+                    run.run_id,
+                    exc,
+                )
 
     # Compile and output via Polars
     df = pl.DataFrame(results)

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import asyncpg
 
@@ -46,3 +48,16 @@ async def acquire() -> asyncpg.Connection:
 async def release(conn: asyncpg.Connection) -> None:
     pool = await get_pool()
     await pool.release(conn)
+
+
+@asynccontextmanager
+async def connection() -> AsyncIterator[asyncpg.Connection]:
+    """Acquire a pooled connection as an async context manager.
+
+    The connection is always released when the block exits — even on error —
+    replacing manual ``acquire()`` / ``release()`` call sites and preventing
+    leaks under concurrent load.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        yield conn

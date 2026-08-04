@@ -3,7 +3,7 @@ import uuid
 from contextlib import ExitStack
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -44,10 +44,14 @@ def _patch_db(conn: AsyncMock) -> ExitStack:
     stack.enter_context(
         patch("evaluator.drift_store.init_drift_tables", new=AsyncMock())
     )
+    pool = MagicMock()
+    acquire_ctx = MagicMock()
+    acquire_ctx.__aenter__ = AsyncMock(return_value=conn)
+    acquire_ctx.__aexit__ = AsyncMock(return_value=None)
+    pool.acquire.return_value = acquire_ctx
     stack.enter_context(
-        patch("evaluator.db.pool.acquire", new=AsyncMock(return_value=conn))
+        patch("evaluator.db.pool.get_pool", new=AsyncMock(return_value=pool))
     )
-    stack.enter_context(patch("evaluator.db.pool.release", new=AsyncMock()))
     return stack
 
 

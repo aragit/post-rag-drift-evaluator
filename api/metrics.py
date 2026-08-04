@@ -46,6 +46,13 @@ DB_BATCH_WRITE_LATENCY_SECONDS = Histogram(
 )
 
 
+sentrix_up = Gauge(
+    "sentrix_up",
+    "Sentrix Evaluator API process status (1 = process is up and serving requests).",
+)
+sentrix_up.set(1.0)
+
+
 def render_metrics() -> bytes:
     """Return the prometheus-formatted metrics payload as UTF-8 bytes."""
     return generate_latest()

@@ -403,3 +403,118 @@ def test_ragresponse_round_trip_with_phase15():
     assert "run_id" in resp2.metadata
     assert "schema_version" in resp2.metadata
     assert "timestamp" in resp2.metadata
+
+
+# ── Phase 2: Evaluation Frame Bridge & Pipeline Provenance ──────────────────
+
+
+def test_round_trip_preserves_arrays_as_native_lists():
+    emb = np.array([1.1, 2.2, 3.3])
+    run = RAGRun(
+        query="q",
+        retrieved_docs=["d1", "d2"],
+        retrieved_embeddings=[emb, emb.copy()],
+        query_embedding=emb,
+        answer_embedding=emb,
+    )
+    d = run.to_dict()
+    # Embeddings must serialize to native Python lists/scalar floats
+    assert isinstance(d["query_embedding"], list)
+    assert all(isinstance(x, float) for x in d["query_embedding"])
+    assert isinstance(d["answer_embedding"], list)
+    assert all(isinstance(e, list) for e in d["retrieved_embeddings"])
+    # Fully JSON serializable with no NumPy types
+    restored = RAGRun.from_dict(json.loads(json.dumps(d)))
+    assert np.allclose(restored.query_embedding, emb)
+    assert np.allclose(restored.answer_embedding, emb)
+    assert np.allclose(restored.retrieved_embeddings[0], emb)
+
+
+def test_to_evaluation_frame_is_json_serializable():
+    from evaluator.schemas.telemetry import RAGEvaluationFrame
+
+    emb = np.array([0.1, 0.2, 0.3])
+    info = RAGSystemInfo(
+        name="NaiveRAG",
+        model="gpt-4o",
+        embedding_model="text-embedding-3-small",
+        retriever="BM25",
+        version="0.1.0",
+    )
+    run = RAGRun(
+        query="What is 2+2?",
+        retrieved_docs=["d1", "d2"],
+        retrieved_doc_ids=["id1", "id2"],
+        retrieved_embeddings=[emb, emb.copy()],
+        query_embedding=emb,
+        answer="4",
+        answer_embedding=emb,
+        system_info=info,
+        metadata={
+            "reflection_iterations": 2,
+            "final_confidence": 0.9,
+            "token_usage": {"total_tokens": 10},
+        },
+    )
+
+    frame = run.to_evaluation_frame({"faithfulness": 0.9, "context_precision": 0.8})
+
+    assert isinstance(frame, RAGEvaluationFrame)
+    assert frame.trace_id == run.run_id
+    assert frame.query.text == "What is 2+2?"
+    assert frame.query.embedding == [0.1, 0.2, 0.3]
+    assert frame.context.text_chunks == ["d1", "d2"]
+    assert frame.context.dense_embeddings == [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]
+    assert frame.metadata.rag_type == "naive"
+    assert frame.metadata.reflection_iterations == 2
+    assert frame.output.generated_answer == "4"
+    assert frame.output.confidence_score == 0.9
+    # Scores flow into the execution metadata extra bag
+    assert frame.metadata.extra["faithfulness"] == 0.9
+    assert frame.metadata.extra["context_precision"] == 0.8
+    assert frame.metadata.extra["token_usage"] == {"total_tokens": 10}
+
+    # Must round-trip through json.dumps/json.loads (no numpy leakage)
+    serialized = json.dumps(frame.model_dump(mode="json"))
+    restored = RAGEvaluationFrame.model_validate_json(serialized)
+    assert restored.query.embedding == [0.1, 0.2, 0.3]
+    assert restored.context.dense_embeddings == [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]
+
+
+def test_to_evaluation_frame_handles_none_embeddings_and_no_scores():
+    from evaluator.schemas.telemetry import RAGEvaluationFrame
+
+    run = RAGRun(query="q", retrieved_docs=["d"])
+    frame = run.to_evaluation_frame()  # default scores=None
+
+    assert isinstance(frame, RAGEvaluationFrame)
+    assert frame.query.embedding is None
+    assert frame.context.dense_embeddings is None
+    assert frame.output.response_embedding is None
+    assert frame.metadata.rag_type == "custom"
+
+
+def test_pipeline_metadata_populates_system_info():
+    from evaluator.rag_pipelines.base import RAGResponse
+
+    resp = RAGResponse(
+        query="test",
+        retrieved_contexts=["ctx1", "ctx2"],
+        generated_answer="answer",
+        query_embedding=[0.1, 0.2],
+        metadata={
+            "pipeline_name": "NaiveRAG",
+            "model": "gpt-4o",
+            "embedding_model": "text-embedding-3-small",
+            "token_usage": {"total_tokens": 5},
+        },
+    )
+    run = resp.to_ragrun()
+    assert run.system_info is not None
+    assert run.system_info.name == "NaiveRAG"
+    assert run.system_info.model == "gpt-4o"
+    assert run.system_info.embedding_model == "text-embedding-3-small"
+
+    # The canonical frame should derive rag_type from the pipeline name
+    frame = run.to_evaluation_frame({"faithfulness": 0.85})
+    assert frame.metadata.rag_type == "naive"

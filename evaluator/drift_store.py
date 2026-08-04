@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -49,19 +50,17 @@ class DriftStore:
         await init_drift_tables(pool=self._pool)
         self._ready = True
 
-    async def _connection(self) -> tuple[Any, bool]:
-        await self._ensure_ready()
-        if self._pool is not None:
-            conn = await self._pool.acquire()
-            return conn, True
-        conn = await db_pool.acquire()
-        return conn, False
+    @asynccontextmanager
+    async def _connection(self):
+        """Yield a pooled connection, releasing it automatically on exit.
 
-    async def _release(self, conn: Any, owned: bool) -> None:
-        if owned and self._pool is not None:
-            await self._pool.release(conn)
-        else:
-            await db_pool.release(conn)
+        Uses ``async with pool.acquire()`` so connections are never leaked,
+        even when an exception propagates out of the caller's block.
+        """
+        await self._ensure_ready()
+        pool = self._pool if self._pool is not None else await db_pool.get_pool()
+        async with pool.acquire() as conn:
+            yield conn
 
     async def close(self) -> None:
         """Release any pool owned by this store instance.
@@ -79,8 +78,7 @@ class DriftStore:
         self, frame: RAGEvaluationFrame, metrics: dict[str, Any]
     ) -> None:
         """Persist a full telemetry frame alongside calculated drift metrics."""
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             await conn.execute(
                 INSERT_EVALUATION_SQL,
                 uuid.uuid4(),
@@ -93,8 +91,6 @@ class DriftStore:
                 bool(metrics.get("is_drifted", False)),
                 frame.model_dump_json(),
             )
-        finally:
-            await self._release(conn, owned)
         logger.info(
             "Evaluation frame %s (rag_type=%s) persisted.",
             frame.trace_id,
@@ -109,8 +105,7 @@ class DriftStore:
         """
         if not frames:
             return
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             await conn.executemany(
                 INSERT_EVALUATION_SQL,
                 [
@@ -128,16 +123,13 @@ class DriftStore:
                     for frame in frames
                 ],
             )
-        finally:
-            await self._release(conn, owned)
         logger.info("Batch persisted %d evaluation frames.", len(frames))
 
     async def get_recent_frames(
         self, rag_type: str | None = None, limit: int = 100
     ) -> list[RAGEvaluationFrame]:
         """Retrieve and deserialize historical evaluation frames."""
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             if rag_type is not None:
                 rows = await conn.fetch(
                     """
@@ -160,8 +152,6 @@ class DriftStore:
                     """,
                     limit,
                 )
-        finally:
-            await self._release(conn, owned)
 
         frames: list[RAGEvaluationFrame] = []
         for row in rows:
@@ -187,11 +177,8 @@ class DriftStore:
         Frames are returned oldest-first so they can be used for chronological
         analysis and sliding-baseline threshold calibration.
         """
-        from datetime import datetime, timedelta, timezone
-
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             rows = await conn.fetch(
                 """
                     SELECT telemetry_frame
@@ -199,12 +186,10 @@ class DriftStore:
                     WHERE timestamp >= $1
                     ORDER BY timestamp ASC
                     LIMIT $2
-                    """,
+                """,
                 cutoff,
                 limit,
             )
-        finally:
-            await self._release(conn, owned)
 
         frames: list[RAGEvaluationFrame] = []
         for row in rows:
@@ -228,9 +213,8 @@ class DriftStore:
         existing ``DriftMonitor.compute_comprehensive_drift`` callers keep
         working until they migrate onto ``record_evaluation``.
         """
-        conn, owned = await self._connection()
         row_id = uuid.uuid4()
-        try:
+        async with self._connection() as conn:
             await conn.execute(
                 INSERT_EVALUATION_SQL,
                 row_id,
@@ -243,8 +227,6 @@ class DriftStore:
                 bool(drift_result.get("is_drifted", False)),
                 json.dumps(drift_result),
             )
-        finally:
-            await self._release(conn, owned)
         logger.info(
             "Drift record persisted: JSD=%s",
             drift_result.get("js_divergence"),
@@ -253,8 +235,7 @@ class DriftStore:
 
     async def get_recent_history(self, hours: int = 24) -> pl.DataFrame:
         """Return recent evaluation rows as a Polars frame with legacy columns."""
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             rows = await conn.fetch(
                 """
                 SELECT id, trace_id, rag_type, timestamp, js_divergence, mmd_score,
@@ -265,8 +246,6 @@ class DriftStore:
                 """,
                 datetime.now(timezone.utc) - timedelta(hours=hours),
             )
-        finally:
-            await self._release(conn, owned)
 
         data: dict[str, list[Any]] = {
             "id": [],
@@ -298,8 +277,7 @@ class DriftStore:
 
     async def get_store_stats(self) -> dict[str, Any]:
         """Return high-level store statistics for the CLI diagnostics."""
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             total = await conn.fetchval("SELECT COUNT(*) FROM telemetry_evaluations")
             by_type_rows = await conn.fetch(
                 """
@@ -323,8 +301,6 @@ class DriftStore:
                       = 'array'
                 """
             )
-        finally:
-            await self._release(conn, owned)
 
         return {
             "total_frames": int(total or 0),
@@ -335,8 +311,7 @@ class DriftStore:
         }
 
     async def get_latest_drift(self) -> dict[str, Any] | None:
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             row = await conn.fetchrow(
                 """
                 SELECT id, trace_id, rag_type, timestamp, js_divergence, mmd_score,
@@ -346,8 +321,6 @@ class DriftStore:
                 LIMIT 1
                 """
             )
-        finally:
-            await self._release(conn, owned)
 
         if row is None:
             return None
@@ -366,8 +339,7 @@ class DriftStore:
         }
 
     async def get_trend(self, window: int = 30) -> pl.DataFrame:
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             rows = await conn.fetch(
                 """
                 SELECT timestamp, js_divergence
@@ -375,8 +347,6 @@ class DriftStore:
                 ORDER BY timestamp
                 """
             )
-        finally:
-            await self._release(conn, owned)
 
         if not rows:
             return pl.DataFrame({"timestamp": [], "jsd_score": []})
@@ -425,9 +395,6 @@ class DriftStore:
         return is_anomaly
 
     async def clear_history(self) -> None:
-        conn, owned = await self._connection()
-        try:
+        async with self._connection() as conn:
             await conn.execute("TRUNCATE TABLE telemetry_evaluations")
-        finally:
-            await self._release(conn, owned)
         logger.info("Telemetry evaluation history cleared.")

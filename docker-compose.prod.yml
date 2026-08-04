@@ -1,7 +1,4 @@
 name: sentrix-evaluator
-version: 0.6.1
-description: Production deployment for Sentrix Evaluator — causal evaluation & optimization engine
-
 services:
   sentrix-api:
     build:
@@ -15,19 +12,21 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-drift_db}
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-drift_db}
+      POSTGRES_USER: sentrix
+      POSTGRES_PASSWORD: sentrix
+      POSTGRES_DB: sentrix_db
+      # asyncpg-native scheme (asyncpg REJECTS the "postgresql+asyncpg://" SQLAlchemy form)
+      DATABASE_URL: postgresql://sentrix:sentrix@postgres:5432/sentrix_db
       REDIS_URL: redis://redis:6379/0
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-mock-key-1234}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/eval')"]
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=2).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -42,16 +41,17 @@ services:
     container_name: sentrix-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-drift_db}
+      POSTGRES_USER: sentrix
+      POSTGRES_PASSWORD: sentrix
+      POSTGRES_DB: sentrix_db
     ports:
-      - "5433:5432"
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-drift_db}"]
+      test: ["CMD-SHELL", "pg_isready -U sentrix -d sentrix_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -74,27 +74,9 @@ services:
     networks:
       - sentrix-network
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: sentrix-prometheus
-    restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-    networks:
-      - sentrix-network
-
 volumes:
   postgres-data:
   redis-data:
-  prometheus-data:
   sentrix-data:
 
 networks:

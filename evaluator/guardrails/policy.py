@@ -121,7 +121,7 @@ class PolicyEvaluator:
         for param_name, value in params.items():
             if param_name in self.parameter_bounds:
                 lo, hi = self.parameter_bounds[param_name]
-                if isinstance(value, (int, float)):
+                if isinstance(value, int | float):
                     if value < lo or value > hi:
                         return PolicyDecision(
                             allowed=False,
@@ -145,7 +145,7 @@ class PolicyEvaluator:
 
         for past_action in execution_history:
             past_ts = past_action.metadata.get("executed_at", now)
-            if isinstance(past_ts, (int, float)):
+            if isinstance(past_ts, int | float):
                 elapsed = now - past_ts
             else:
                 # If no timestamp, assume it was just now
@@ -177,7 +177,7 @@ class PolicyEvaluator:
 
         for past_action in execution_history:
             past_ts = past_action.metadata.get("executed_at", now)
-            if isinstance(past_ts, (int, float)):
+            if isinstance(past_ts, int | float):
                 elapsed = now - past_ts
             else:
                 elapsed = 0.0

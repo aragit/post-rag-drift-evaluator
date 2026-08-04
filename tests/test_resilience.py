@@ -12,7 +12,7 @@ async def test_naive_rag_db_connection_timeout():
     pipeline = NaiveRAG()
 
     with patch(
-        "evaluator.rag_pipelines.naive_rag.acquire",
+        "evaluator.rag_pipelines.naive_rag.connection",
         side_effect=TimeoutError("Connection timeout"),
     ):
         result = await pipeline._execute_vector_search([0.1] * 1536, k=2)

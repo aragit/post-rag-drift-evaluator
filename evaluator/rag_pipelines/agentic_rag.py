@@ -4,7 +4,7 @@ import litellm
 
 from evaluator.cache import EmbeddingCache, ResultCache
 from evaluator.config import config
-from evaluator.db.pool import acquire, release
+from evaluator.db.pool import connection
 from evaluator.logging_config import get_logger
 from evaluator.rag_pipelines.base import BaseRAGPipeline, RAGResponse
 from evaluator.utils.mock_embedding import (
@@ -12,7 +12,7 @@ from evaluator.utils.mock_embedding import (
     generate_mock_embedding,
     is_mock_key,
 )
-from evaluator.utils.retry import call_with_retry
+from evaluator.utils.retry import async_call_with_retry
 
 logger = get_logger("AgenticRAG")
 
@@ -33,17 +33,15 @@ class AgenticRAG(BaseRAGPipeline):
             ORDER BY embedding <=> $1::vector
             LIMIT $2;
         """
-        conn = None
         try:
-            conn = await acquire()
-            records = await conn.fetch(query, embedding, k)
-            return [row["content"] for row in records]
+            async with connection() as conn:
+                records = await conn.fetch(query, embedding, k)
+                return [row["content"] for row in records]
         except Exception as e:
             logger.error(f"Database vector extraction aborted: {e}")
-            return []
-        finally:
-            if conn is not None:
-                await release(conn)
+            return [
+                "Fallback: Database connectivity failure context execution placeholder."
+            ]
 
     async def _decompose_query(self, query: str) -> list[str]:
         planner_prompt = (
@@ -54,8 +52,8 @@ class AgenticRAG(BaseRAGPipeline):
             response = generate_mock_completion(planner_prompt, response_format="json")
             logger.info("Using mock completion for offline mode.")
         else:
-            response = call_with_retry(
-                litellm.completion,
+            response = await async_call_with_retry(
+                litellm.acompletion,
                 model=self.model_name,
                 messages=[{"role": "user", "content": planner_prompt}],
                 response_format={"type": "json_object"},
@@ -87,8 +85,8 @@ class AgenticRAG(BaseRAGPipeline):
             )
             logger.info("Using mock reflection for offline mode.")
         else:
-            response = call_with_retry(
-                litellm.completion,
+            response = await async_call_with_retry(
+                litellm.acompletion,
                 model=self.model_name,
                 messages=[{"role": "user", "content": reflection_prompt}],
                 response_format={"type": "json_object"},
@@ -117,8 +115,8 @@ class AgenticRAG(BaseRAGPipeline):
             response = generate_mock_completion(synthesis_prompt)
             logger.info("Using mock completion for offline mode.")
         else:
-            response = call_with_retry(
-                litellm.completion,
+            response = await async_call_with_retry(
+                litellm.acompletion,
                 model=self.model_name,
                 messages=[{"role": "user", "content": synthesis_prompt}],
             )
@@ -140,8 +138,8 @@ class AgenticRAG(BaseRAGPipeline):
                 vec = generate_mock_embedding(sub_q)
                 logger.info("Using mock embedding for offline mode.")
             else:
-                embed_resp = call_with_retry(
-                    litellm.embedding, model=self.embedding_model, input=[sub_q]
+                embed_resp = await async_call_with_retry(
+                    litellm.aembedding, model=self.embedding_model, input=[sub_q]
                 )
                 vec = embed_resp["data"][0]["embedding"]
                 self._embedding_cache.set(sub_q, vec)
@@ -182,8 +180,8 @@ class AgenticRAG(BaseRAGPipeline):
                 elif is_mock_key(config.OPENAI_API_KEY):
                     vec = generate_mock_embedding(missing_item)
                 else:
-                    embed_resp = call_with_retry(
-                        litellm.embedding,
+                    embed_resp = await async_call_with_retry(
+                        litellm.aembedding,
                         model=self.embedding_model,
                         input=[missing_item],
                     )
@@ -202,6 +200,12 @@ class AgenticRAG(BaseRAGPipeline):
             query_embedding=primary_vector or [],
             reflection_iterations=reflection_iterations,
             final_confidence=final_confidence,
-            metadata={"sub_queries_generated": sub_queries, "token_usage": {}},
+            metadata={
+                "pipeline_name": self.__class__.__name__,
+                "model": self.model_name,
+                "embedding_model": self.embedding_model,
+                "sub_queries_generated": sub_queries,
+                "token_usage": {},
+            },
         )
         return result

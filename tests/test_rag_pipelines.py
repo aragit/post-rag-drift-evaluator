@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -5,6 +6,20 @@ import pytest
 from evaluator.rag_pipelines.agentic_rag import AgenticRAG
 from evaluator.rag_pipelines.base import RAGResponse
 from evaluator.rag_pipelines.naive_rag import NaiveRAG
+
+
+def _make_fake_connection(conn):
+    """Return a zero-arg async context manager factory yielding ``conn``.
+
+    Patches ``evaluator.rag_pipelines.<pipe>.connection`` with this so the
+    pipeline's ``async with connection() as conn`` yields the provided mock.
+    """
+
+    @asynccontextmanager
+    async def _cm():
+        yield conn
+
+    return _cm
 
 
 @pytest.mark.asyncio
@@ -17,9 +32,11 @@ async def test_naive_rag_executes_vector_search():
         {"content": "context two"},
     ]
 
-    with patch("evaluator.rag_pipelines.naive_rag.acquire", return_value=mock_conn):
-        with patch("evaluator.rag_pipelines.naive_rag.release"):
-            result = await pipeline._execute_vector_search([0.1] * 1536, k=2)
+    with patch(
+        "evaluator.rag_pipelines.naive_rag.connection",
+        new=_make_fake_connection(mock_conn),
+    ):
+        result = await pipeline._execute_vector_search([0.1] * 1536, k=2)
 
     assert result == ["context one", "context two"]
     mock_conn.fetch.assert_called_once()
@@ -53,7 +70,8 @@ async def test_naive_rag_handles_db_failure():
     pipeline = NaiveRAG()
 
     with patch(
-        "evaluator.rag_pipelines.naive_rag.acquire", side_effect=Exception("DB error")
+        "evaluator.rag_pipelines.naive_rag.connection",
+        side_effect=Exception("DB error"),
     ):
         result = await pipeline._execute_vector_search([0.1] * 1536, k=2)
 

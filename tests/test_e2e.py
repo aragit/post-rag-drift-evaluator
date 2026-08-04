@@ -1,14 +1,14 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import polars as pl
 
 from evaluator.benchmark import run_benchmark
 
 
-@patch("evaluator.rag_pipelines.naive_rag.litellm.completion")
-@patch("evaluator.rag_pipelines.naive_rag.litellm.embedding")
-@patch("evaluator.rag_pipelines.agentic_rag.litellm.completion")
-@patch("evaluator.rag_pipelines.agentic_rag.litellm.embedding")
+@patch("evaluator.rag_pipelines.naive_rag.litellm.acompletion", new_callable=AsyncMock)
+@patch("evaluator.rag_pipelines.naive_rag.litellm.aembedding", new_callable=AsyncMock)
+@patch("evaluator.rag_pipelines.agentic_rag.litellm.acompletion", new_callable=AsyncMock)
+@patch("evaluator.rag_pipelines.agentic_rag.litellm.aembedding", new_callable=AsyncMock)
 @patch("evaluator.utils.metrics.litellm.completion")
 async def test_end_to_end_benchmark_execution(
     mock_judge_comp,

@@ -23,6 +23,27 @@ if TYPE_CHECKING:
 logger = get_logger("DriftMonitor")
 
 
+def _freedman_diaconis_bin_count(data: np.ndarray) -> int:
+    """Optimal 1-D histogram bin count via the Freedman-Diaconis rule.
+
+    ``h = 2 * IQR(X) / n^(1/3)`` with ``num_bins = ceil(range / h)``.
+    Falls back to 20 bins for zero-variance / flat arrays or when fewer
+    than 2 samples are available, avoiding division-by-zero hazards.
+    """
+    data = np.asarray(data, dtype=float).ravel()
+    n = data.size
+    if n < 2:
+        return 20
+    iqr = float(np.subtract(*np.percentile(data, [75, 25])))
+    data_range = float(np.max(data) - np.min(data))
+    if iqr > 0 and data_range > 0:
+        bin_width = 2 * iqr / (n ** (1 / 3))
+        if bin_width > 0:
+            num_bins = int(np.ceil(data_range / bin_width))
+            return max(10, min(num_bins, 100))
+    return 20
+
+
 class DriftMonitor:
     def __init__(
         self,
@@ -54,8 +75,9 @@ class DriftMonitor:
             idx = np.random.choice(n_samples, size=n_samples, replace=True)
             bootstrap_sample = baseline_embeddings[idx]
 
-            p = self._calculate_empirical_distribution(baseline_embeddings)
-            q = self._calculate_empirical_distribution(bootstrap_sample)
+            p, q = self._jensen_shannon_distributions(
+                baseline_embeddings, bootstrap_sample
+            )
             js_score = float(jensenshannon(p, q))
             js_scores.append(js_score)
 
@@ -107,21 +129,26 @@ class DriftMonitor:
         n_components = min(10, baseline_embeddings.shape[1])
         pca = PCA(n_components=n_components)
         pca.fit(baseline_embeddings)
-        baseline_proj = pca.transform(baseline_embeddings)
 
-        for i in range(n_components):
-            col = baseline_proj[:, i].reshape(-1, 1)
-            try:
-                kde = gaussian_kde(col.ravel())
-                eval_points = np.linspace(col.min(), col.max(), 100).reshape(-1, 1)
-                densities = kde(eval_points.T)
-                densities = np.clip(densities, 1e-12, None)
-                entropy = -float(np.sum(densities * np.log(densities)))
-                kl_scores.append(entropy)
-            except Exception:
-                kl_scores.append(0.0)
+        # Bootstrap split-half KL divergence, aligned with the runtime
+        # metric computed in :meth:`compute_per_component_drift`.
+        actual_kl_iters = min(n_bootstrap, max(1, n_samples // 2))
+        for _ in range(actual_kl_iters):
+            idx = np.random.choice(n_samples, size=n_samples, replace=True)
+            boot_proj = pca.transform(baseline_embeddings[idx])
+            half = boot_proj.shape[0] // 2
+            if half < 2:
+                continue
+            for i in range(n_components):
+                try:
+                    kl = self._kl_divergence_kde(
+                        boot_proj[:half, i], boot_proj[half:, i]
+                    )
+                    kl_scores.append(max(0.0, kl))
+                except Exception:
+                    kl_scores.append(0.0)
 
-        kl_scores_arr = np.array(kl_scores)
+        kl_scores_arr = np.array(kl_scores) if kl_scores else np.array([0.0])
         kl_mean = float(np.mean(kl_scores_arr))
         kl_std = float(np.std(kl_scores_arr))
         calibrated_kl_threshold = kl_mean + 3 * kl_std
@@ -168,20 +195,81 @@ class DriftMonitor:
             or max_kl > kl_threshold
         )
 
-    def _calculate_empirical_distribution(
-        self, embeddings: np.ndarray, bins: int = 20
-    ) -> np.ndarray:
-        if embeddings.ndim == 1:
-            embeddings = embeddings.reshape(1, -1)
+    def _jensen_shannon_distributions(
+        self, baseline: np.ndarray, current: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Project baseline and current onto a shared 1-D PCA axis and return
+        normalized probability distributions over a shared, FD-binned edge range.
+
+        Both samples share the same PCA basis, the same bin count
+        (Freedman-Diaconis rule) and the same ``range=(min, max)`` computed
+        across both samples, so the resulting JSD is mathematically
+        consistent rather than computed over mismatched axes/edges.
+        """
+        baseline = np.atleast_2d(np.asarray(baseline, dtype=float))
+        current = np.atleast_2d(np.asarray(current, dtype=float))
+        combined = np.vstack([baseline, current])
+        if combined.shape[1] == 0:
+            raise ValueError(
+                "Cannot compute drift distributions from zero-width embeddings"
+            )
+
         pca = PCA(n_components=1)
-        with np.errstate(invalid="ignore", divide="ignore"):
-            reduced = pca.fit_transform(embeddings).flatten()
-        if np.ptp(reduced) < 1e-15:
-            hist = np.ones(bins) / bins
-        else:
-            hist, _ = np.histogram(reduced, bins=bins, density=True)
-        prob_dist = hist + 1e-12
-        return prob_dist / np.sum(prob_dist)
+        reduced = pca.fit_transform(combined).ravel()
+        n_b = baseline.shape[0]
+        red_b = reduced[:n_b]
+        red_c = reduced[n_b:]
+
+        lo = float(np.min(reduced))
+        hi = float(np.max(reduced))
+        num_bins = _freedman_diaconis_bin_count(reduced)
+        eps = 1e-12
+
+        if hi - lo < eps:
+            # Degenerate (effectively constant) projection → uniform masses.
+            p = np.full(num_bins, 1.0 / num_bins)
+            q = np.full(num_bins, 1.0 / num_bins)
+            return p, q
+
+        p_hist, _ = np.histogram(red_b, bins=num_bins, range=(lo, hi), density=True)
+        q_hist, _ = np.histogram(red_c, bins=num_bins, range=(lo, hi), density=True)
+
+        p = np.clip(p_hist, eps, None)
+        q = np.clip(q_hist, eps, None)
+        return p / p.sum(), q / q.sum()
+
+    @staticmethod
+    def _kl_divergence_kde(
+        baseline_col: np.ndarray,
+        current_col: np.ndarray,
+        n_points: int = 100,
+    ) -> float:
+        """Continuous KL(baseline || current) via 1-D KDE on a shared grid.
+
+        The Riemann sum is scaled by the evaluation grid step ``dx`` so the
+        result approximates the true continuous KL divergence, making the
+        value approximately invariant to grid resolution (consistent with the
+        runtime metric used in :meth:`compute_per_component_drift`).
+        """
+        baseline_col = np.asarray(baseline_col, dtype=float).ravel()
+        current_col = np.asarray(current_col, dtype=float).ravel()
+
+        lo = float(min(baseline_col.min(), current_col.min()))
+        hi = float(max(baseline_col.max(), current_col.max()))
+        if hi - lo < 1e-15:
+            return 0.0
+
+        eval_points = np.linspace(lo, hi, n_points)
+        dx = float(eval_points[1] - eval_points[0])
+        eps = 1e-12
+
+        kde_b = gaussian_kde(baseline_col)
+        kde_c = gaussian_kde(current_col)
+
+        p_b = np.clip(kde_b(eval_points), eps, None)
+        p_c = np.clip(kde_c(eval_points), eps, None)
+
+        return float(np.sum(p_b * np.log(p_b / p_c)) * dx)
 
     def _extract_embeddings(self, df: pl.DataFrame, embedding_col: str) -> np.ndarray:
         return np.array(df[embedding_col].to_list())
@@ -195,8 +283,7 @@ class DriftMonitor:
         baseline_matrix = self._extract_embeddings(baseline_df, embedding_col)
         current_matrix = self._extract_embeddings(current_df, embedding_col)
 
-        p = self._calculate_empirical_distribution(baseline_matrix)
-        q = self._calculate_empirical_distribution(current_matrix)
+        p, q = self._jensen_shannon_distributions(baseline_matrix, current_matrix)
 
         js_divergence = float(jensenshannon(p, q))
 
@@ -316,22 +403,9 @@ class DriftMonitor:
             current_col = current_col.reshape(-1, 1)
 
             try:
-                kde_b = gaussian_kde(baseline_col.ravel())
-                kde_c = gaussian_kde(current_col.ravel())
-
-                eval_points = np.linspace(
-                    min(baseline_col.min(), current_col.min()),
-                    max(baseline_col.max(), current_col.max()),
-                    100,
-                ).reshape(-1, 1)
-
-                p_b = kde_b(eval_points.T)
-                p_c = kde_c(eval_points.T)
-
-                p_b = np.clip(p_b, 1e-12, None)
-                p_c = np.clip(p_c, 1e-12, None)
-
-                kl = float(np.sum(p_b * np.log(p_b / p_c)))
+                kl = self._kl_divergence_kde(
+                    baseline_col.ravel(), current_col.ravel()
+                )
                 kl_divergences.append(kl)
             except Exception:
                 kl_divergences.append(0.0)
@@ -587,6 +661,10 @@ class DriftMonitor:
         )
         self.mmd_threshold = thresholds.get(
             "vector_mmd_threshold", self._saved_thresholds["mmd"]
+        )
+        self.per_component_kl_threshold = thresholds.get(
+            "vector_per_component_kl_threshold",
+            self._saved_thresholds["kl"],
         )
         self._graph_calculator.spectral_threshold = thresholds.get(
             "graph_spectral_threshold", self._saved_thresholds["spectral"]

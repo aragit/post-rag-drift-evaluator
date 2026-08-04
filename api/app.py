@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 
 from api.routes.health import router as health_router
@@ -13,7 +14,7 @@ from evaluator.config import config
 from evaluator.db import pool as db_pool
 from evaluator.drift_monitor import DriftMonitor
 from evaluator.drift_store import DriftStore
-from evaluator.logging_config import get_logger
+from evaluator.logging_config import get_logger, set_correlation_id
 from ingestion.queue import AsyncIngestionBuffer, get_ingestion_buffer
 from ingestion.redis_queue import RedisStreamBuffer
 
@@ -69,6 +70,14 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @application.middleware("http")
+    async def _correlation_id_middleware(request: Request, call_next):
+        correlation_id = request.headers.get("X-Request-ID") or uuid4().hex
+        set_correlation_id(correlation_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = correlation_id
+        return response
 
     application.include_router(health_router)
     application.include_router(metrics_router)

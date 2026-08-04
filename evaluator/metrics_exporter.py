@@ -4,10 +4,7 @@ from prometheus_client import (
     Counter,
     Gauge,
     Histogram,
-    start_http_server,
 )
-
-from evaluator.config import config
 
 logger = logging.getLogger("MetricsExporter")
 
@@ -53,16 +50,6 @@ rag_cache_miss_total = Counter(
     "Total cache misses",
     ["cache_type"],
 )
-
-METRICS_PORT = getattr(config, "METRICS_PORT", 8000)
-
-
-def start_metrics_server() -> None:
-    try:
-        start_http_server(METRICS_PORT)
-        logger.info(f"Prometheus metrics server started on port {METRICS_PORT}")
-    except Exception as e:
-        logger.error(f"Failed to start metrics server: {e}")
 
 
 def record_drift_metrics(result: dict) -> None:

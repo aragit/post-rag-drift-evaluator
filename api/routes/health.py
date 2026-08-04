@@ -18,6 +18,12 @@ async def healthz() -> dict[str, str]:
     return {"status": "alive"}
 
 
+@router.get("/health", tags=["health"])
+async def health() -> dict[str, str]:
+    """Liveness/readiness alias used by the container and k8s probes."""
+    return {"status": "alive"}
+
+
 @router.get("/readyz", tags=["health"])
 async def readyz(request: Request) -> dict[str, Any]:
     """Readiness probe — verifies DB pool reachability and buffer state."""

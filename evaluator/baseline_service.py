@@ -5,6 +5,7 @@ import random
 from typing import Any
 
 import numpy as np
+import polars as pl
 
 from .config import config
 from .drift_store import DriftStore
@@ -70,6 +71,7 @@ class DynamicBaselineService:
 
         jsd_values: list[float] = []
         mmd_values: list[float] = []
+        kl_values: list[float] = []
         spectral_values: list[float] = []
         entropy_values: list[float] = []
 
@@ -91,6 +93,26 @@ class DynamicBaselineService:
             spectral_values.append(graph_result["spectral_distance"])
             entropy_values.append(swarm_result["transition_entropy_delta"])
 
+            # Bootstrap split-half per-component KL divergence, aligned with the
+            # runtime metric in DriftMonitor.compute_per_component_drift.
+            mean_kl = 0.0
+            try:
+                b_vecs = monitor._collect_vector_embeddings(split_1)
+                c_vecs = monitor._collect_vector_embeddings(split_2)
+                if (
+                    b_vecs is not None
+                    and c_vecs is not None
+                    and b_vecs.shape[1] == c_vecs.shape[1]
+                ):
+                    b_df = pl.DataFrame({"embedding": b_vecs.tolist()})
+                    c_df = pl.DataFrame({"embedding": c_vecs.tolist()})
+                    _, mean_kl, _ = monitor.compute_per_component_drift(
+                        b_df, c_df
+                    )
+            except Exception:
+                mean_kl = 0.0
+            kl_values.append(float(mean_kl))
+
         thresholds: dict[str, float] = {}
 
         def _calibrate(metric: str, values: list[float]) -> None:
@@ -102,6 +124,8 @@ class DynamicBaselineService:
             _calibrate("vector_jsd_threshold", jsd_values)
         if mmd_values:
             _calibrate("vector_mmd_threshold", mmd_values)
+        if kl_values:
+            _calibrate("vector_per_component_kl_threshold", kl_values)
         if spectral_values:
             _calibrate("graph_spectral_threshold", spectral_values)
         if entropy_values:
