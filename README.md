@@ -1,3 +1,5 @@
+<div align="center">
+
 # Sentrix Post-RAG Drift Evaluator 🛡️
 Zero-Disk, Closed-Loop Latent Drift Remediation for Production RAG & LLM Swarms
 
@@ -8,9 +10,11 @@ Zero-Disk, Closed-Loop Latent Drift Remediation for Production RAG & LLM Swarms
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/tests-423%20passed-success.svg)](#testing--verification)
 
-**Sentrix Evaluator** is an enterprise-grade, zero-disk, closed-loop drift remediation engine for Retrieval-Augmented Generation (RAG), multi-modal, and LLM agent pipelines.
+</div>
 
-It bridges non-parametric latent embedding space monitoring with causal fault attribution, counterfactual impact simulation, track-aware optimization, and safety policy guardrails — delivering automated, real-time remediation without introducing disk I/O latency or unbounded operational feedback loops.
+**Sentrix Evaluator** is an enterprise-grade observability and dynamic remediation engine built to eliminate silent performance decay in Retrieval-Augmented Generation (RAG), multi-modal workflows, and LLM agent swarms.
+
+By coupling continuous non-parametric embedding space monitoring (MMD, SWD, FD-JSD) with Bayesian causal fault attribution, Sentrix isolates vector and generation drift at the layer level. It executes zero-disk counterfactual impact simulations and policy-gated mitigation in sub-millisecond cycles—preventing system failure without adding disk I/O overhead or triggering unbounded operational feedback loops.
 
 ---
 
