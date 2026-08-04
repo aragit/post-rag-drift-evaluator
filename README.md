@@ -1,4 +1,5 @@
-# Sentrix Evaluator (`post-rag-drift-evaluator`)
+# Sentrix Post-RAG Drift Evaluator 🛡️
+Zero-Disk, Closed-Loop Latent Drift Remediation for Production RAG & LLM Swarms
 
 [![Version](https://img.shields.io/badge/release-v0.6.1-blue.svg)](https://github.com/aragit/post-rag-drift-evaluator/releases/tag/v0.6.1)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
