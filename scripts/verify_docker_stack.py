@@ -348,7 +348,7 @@ def check_metrics() -> None:
 
     required = [
         ("frame_ingestion_total", "FRAME_INGESTION_TOTAL"),
-        ("drift_score_gauge", "DRIFT_SCORE_GAUGE"),
+        ("sentrix_drift_score", "DRIFT_SCORE_GAUGE"),
         ("db_batch_write_latency_seconds", "DB_BATCH_WRITE_LATENCY_SECONDS"),
     ]
     for metric_name, label in required:

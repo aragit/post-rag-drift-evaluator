@@ -56,8 +56,8 @@ async def test_metrics_endpoint_returns_200_with_prometheus_format():
     body = response.text
     assert "frame_ingestion_total" in body
     assert "ingestion_buffer_depth" in body
-    assert "evaluation_latency_seconds" in body
-    assert "drift_score_gauge" in body
+    assert "sentrix_evaluation_duration_seconds" in body
+    assert "sentrix_drift_score" in body
     assert "drift_alerts_total" in body
     assert "db_batch_write_latency_seconds" in body
 
@@ -98,7 +98,7 @@ async def test_evaluation_latency_metric_observed():
         assert response.status_code == 200
 
         latency_count = _sample_value(
-            "evaluation_latency_seconds_count", {"status": "success"}
+            "sentrix_evaluation_duration_seconds_count", {"status": "success"}
         )
         assert latency_count is not None
         assert latency_count >= 1.0
@@ -135,10 +135,10 @@ async def test_drift_score_gauges_updated():
         )
         assert response.status_code == 200
 
-        jsd = _sample_value("drift_score_gauge", {"metric_type": "vector_jsd"})
-        mmd = _sample_value("drift_score_gauge", {"metric_type": "vector_mmd"})
-        spectral = _sample_value("drift_score_gauge", {"metric_type": "graph_spectral"})
-        entropy = _sample_value("drift_score_gauge", {"metric_type": "swarm_entropy"})
+        jsd = _sample_value("sentrix_drift_score", {"metric_type": "vector_jsd"})
+        mmd = _sample_value("sentrix_drift_score", {"metric_type": "vector_mmd"})
+        spectral = _sample_value("sentrix_drift_score", {"metric_type": "graph_spectral"})
+        entropy = _sample_value("sentrix_drift_score", {"metric_type": "swarm_entropy"})
 
         assert jsd is not None
         assert mmd is not None
