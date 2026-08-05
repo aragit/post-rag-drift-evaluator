@@ -1,8 +1,32 @@
+import pytest
 import requests
 
 PROMETHEUS_URL = "http://localhost:9090"
 GRAFANA_URL = "http://localhost:3000"
 API_URL = "http://localhost:8000"
+
+
+def _stack_reachable() -> bool:
+    """True when the Sentrix control plane (API + Prometheus + Grafana) is up.
+
+    These are live-stack integration tests. In CI, where ``docker compose up``
+    is not run, they self-skip (rather than failing with ConnectionRefused).
+    """
+    try:
+        return (
+            requests.get(f"{API_URL}/metrics", timeout=2).status_code == 200
+            and requests.get(f"{PROMETHEUS_URL}/-/healthy", timeout=2).status_code == 200
+            and requests.get(f"{GRAFANA_URL}/api/health", timeout=2).status_code == 200
+        )
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _stack_reachable(),
+    reason="Sentrix control plane not running "
+    "(start with: docker compose up -d && ./scripts/test_stack.sh)",
+)
 
 
 def test_api_metrics_format():
