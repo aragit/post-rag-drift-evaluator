@@ -6,7 +6,7 @@ endpoint with varying embeddings, graph topologies, and agent hops to
 produce dynamic drift metrics visible in Grafana dashboards.
 
 Usage:
-    python scripts/stream_metrics.py [--interval 2] [--duration 60]
+    python scripts/stream_metrics.py [--interval 2] [--duration 60] [--count 10]
 
 Requirements: httpx (pip install httpx)
 """
@@ -117,6 +117,12 @@ def main() -> None:
         default=0,
         help="Total duration in seconds (0 = unlimited, default: 0)",
     )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=0,
+        help="Maximum number of evaluation requests to send (0 = unlimited, default: 0)",
+    )
     args = parser.parse_args()
 
     with httpx.Client(base_url=BASE_URL, timeout=30) as client:
@@ -131,11 +137,16 @@ def main() -> None:
         request_count = 0
 
         print(f"Streaming metrics every {args.interval}s"
-              f"{f' for {args.duration}s' if args.duration > 0 else ' (unlimited)'}...")
+              f"{f' for {args.duration}s' if args.duration > 0 else ' (unlimited)'}..."
+              f"{f' | total {args.count} requests' if args.count > 0 else ''}...")
         try:
             while True:
                 if args.duration > 0 and (time.monotonic() - start_time) >= args.duration:
                     print(f"\nDuration reached. Total requests sent: {request_count}")
+                    break
+
+                if args.count > 0 and request_count >= args.count:
+                    print(f"\nCount reached. Total requests sent: {request_count}")
                     break
 
                 # Gradually increase drift to create visible metric trends

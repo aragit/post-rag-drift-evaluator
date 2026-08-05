@@ -375,6 +375,32 @@ Cross-Platform Note: Docker Desktop (macOS/Windows) automatically resolves `host
 
 ---
 
+## 🧪 Verification & Automated Testing
+
+The control plane ships a two-layer end-to-end test suite validating
+container orchestration, API health, Prometheus metric scraping, and
+Grafana dashboard/datasource provisioning.
+
+```bash
+# 1. Spin up the control plane
+docker compose up -d
+
+# 2. Run the shell infrastructure test suite (containers, endpoints,
+#    Grafana provisioning, synthetic metric stream, Prometheus scrape)
+./scripts/test_stack.sh
+
+# 3. Run the Python integration suite (metrics format, target health,
+#    drift-score bounds, Grafana admin auth)
+pytest tests/test_observability.py -v
+```
+
+> `test_drift_score_bounds` asserts the `[0, 1]` Jensen–Shannon Divergence
+> bounds on `sentrix_drift_score{metric_type="vector_jsd"}`; the MMD,
+> spectral-distance and transition-entropy-delta gauges are naturally
+> unbounded and are not included in this assertion.
+
+---
+
 ## Quickstart
 
 ### Installation

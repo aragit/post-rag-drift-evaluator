@@ -3,7 +3,7 @@ name: post-rag-drift-evaluator
 services:
   db:
     image: pgvector/pgvector:pg17
-    container_name: prde-db
+    container_name: sentrix-postgres
     restart: unless-stopped
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -22,7 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: prde-redis
+    container_name: sentrix-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -38,7 +38,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: prde-api
+    container_name: sentrix-api
     restart: unless-stopped
     depends_on:
       db:
@@ -52,6 +52,9 @@ services:
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
+    # Single worker keeps the in-process prometheus_client registry coherent
+    # (one scrape target == one registry), so scraped gauges are deterministic.
+    entrypoint: ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:8000/healthz',timeout=2) or sys.exit(0)"]
       interval: 30s
@@ -59,15 +62,9 @@ services:
       retries: 3
       start_period: 15s
 
-volumes:
-  postgres_data:
-
-  grafana:
-
-services:
   grafana:
     image: grafana/grafana
-    container_name: prde-grafana
+    container_name: sentrix-grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -82,15 +79,14 @@ services:
       prometheus:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
-      interval: 30s
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 15s
 
   prometheus:
     image: prom/prometheus
-    container_name: prde-prometheus
+    container_name: sentrix-prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -109,3 +105,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  postgres_data:
+  grafana:
